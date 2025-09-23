@@ -76,12 +76,16 @@ async def bulk_assign_users_to_admin(
         if existing:
             continue  # Skip if already assigned
         
-        # Create new assignment
+        # Create new assignment with tenant_id validation/fallback
+        user_tenant_id = user.tenant_id or current_user.tenant_id
+        if not user_tenant_id:
+            raise HTTPException(status_code=400, detail=f"User {user.email} has no valid tenant_id")
+        
         assignment = UserAssignment(
             id=str(uuid.uuid4()),
             user_id=user.id,
             admin_id=str(request.admin_id),
-            tenant_id=user.tenant_id,
+            tenant_id=user_tenant_id,
             assigned_by=current_user.id,
             notes=request.notes
         )
@@ -195,12 +199,16 @@ async def bulk_assign_tests_to_users(
             if existing:
                 continue  # Skip if already assigned
             
-            # Create new test assignment
+            # Create new test assignment with tenant_id validation
+            user_tenant_id = user.tenant_id or current_user.tenant_id
+            if not user_tenant_id:
+                raise HTTPException(status_code=400, detail=f"User {user.email} has no valid tenant_id")
+            
             assignment = TestAssignment(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
                 admin_id=current_user.id,
-                tenant_id=user.tenant_id,
+                tenant_id=user_tenant_id,
                 test_type=test_type,
                 status='assigned',  # Explicitly set status
                 due_date=request.due_date,
