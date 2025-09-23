@@ -4,6 +4,7 @@ Currently adds missing columns and indexes for competency_dictionaries.
 """
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+import logging
 
 
 def _column_missing(engine: Engine, table: str, column: str) -> bool:
