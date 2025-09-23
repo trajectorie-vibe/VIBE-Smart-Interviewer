@@ -639,7 +639,9 @@ class BulkUserAssignmentRequest(BaseModel):
     notes: Optional[str] = None
 
 class BulkTestAssignmentRequest(BaseModel):
-    user_ids: List[uuid.UUID]
+    # Accept user IDs as strings to be more permissive with client payloads;
+    # the API will validate existence/role via database lookups.
+    user_ids: List[str]
     test_types: List[str] = Field(..., description="List of test types to assign (JDT, SJT)")
     due_date: Optional[datetime] = None
     max_attempts: int = 3

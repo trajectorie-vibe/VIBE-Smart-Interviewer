@@ -155,9 +155,37 @@ def migrate_enhanced_media_and_submissions(engine: Engine):
             conn.execute(text(f"ALTER TABLE {submissions_table} ADD COLUMN test_configuration JSON"))
 
 
+def ensure_user_tenant_ids(engine: Engine):
+    """Ensure all users have valid tenant_id values."""
+    try:
+        with engine.connect() as conn:
+            # Get system tenant ID
+            result = conn.execute(text("SELECT id FROM tenants WHERE name = 'System' LIMIT 1"))
+            system_tenant = result.fetchone()
+            if not system_tenant:
+                logging.warning("No System tenant found, skipping tenant_id migration")
+                return
+            
+            system_tenant_id = system_tenant[0]
+            
+            # Update users with NULL tenant_id
+            result = conn.execute(
+                text("UPDATE users SET tenant_id = :tenant_id WHERE tenant_id IS NULL"),
+                {"tenant_id": system_tenant_id}
+            )
+            
+            if result.rowcount > 0:
+                logging.info(f"Updated {result.rowcount} users with NULL tenant_id to System tenant")
+            
+            conn.commit()
+    except Exception as e:
+        logging.error(f"Error ensuring user tenant_ids: {e}")
+
+
 def run_migrations(engine: Engine):
     """Run all lightweight migrations."""
     # Add any future migrations here
     migrate_competency_dictionary(engine)
     migrate_assignment_tables(engine)
     migrate_enhanced_media_and_submissions(engine)
+    ensure_user_tenant_ids(engine)

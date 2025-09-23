@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 import logging
 import uvicorn
 import os
+import json
 from pathlib import Path
 
 # Import app modules
@@ -46,14 +47,67 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Load environment variables early (supports running `python .\\main.py`)
+try:
+    from dotenv import load_dotenv
+    # Load .env.local first (developer overrides), then fallback to .env
+    env_loaded = False
+    for env_file in (".env.local", ".env"):
+        if os.path.exists(env_file):
+            load_dotenv(env_file, override=False)
+            env_loaded = True
+    if env_loaded:
+        logging.info("Environment variables loaded from .env(.local)")
+except Exception:
+    # dotenv is optional; ignore if not available
+    pass
+
+
 # CORS configuration
+def _parse_allowed_origins(env_value: str | None) -> list[str]:
+    """Parse ALLOWED_ORIGINS from env supporting JSON array or CSV.
+
+    Examples:
+      - ALLOWED_ORIGINS=["http://localhost:3001","http://127.0.0.1:3001"]
+      - ALLOWED_ORIGINS=http://localhost:3001,http://127.0.0.1:3001
+    """
+    if not env_value:
+        return []
+    s = env_value.strip()
+    # Try JSON first if it looks like an array
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            data = json.loads(s)
+            if isinstance(data, list):
+                return [str(x).strip().strip('"\'') for x in data if str(x).strip()]
+        except Exception:
+            pass
+    # Fallback: CSV split
+    parts = [p.strip().strip('"\'') for p in s.split(",")]
+    return [p for p in parts if p]
+
+_env_origins = os.getenv("ALLOWED_ORIGINS", "")
+origins = _parse_allowed_origins(_env_origins)
+if not origins:
+    # Sensible dev defaults including Next.js/Vite common ports
+    origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
+logging.info(f"CORS allow_origins: {origins}")
 
 # Trusted hosts middleware
 app.add_middleware(
