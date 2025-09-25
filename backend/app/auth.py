@@ -381,32 +381,34 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
 
 # Rate limiting (basic implementation)
 class RateLimiter:
-    """Simple in-memory rate limiter"""
+    """Simple in-memory rate limiter that records only failed attempts."""
     
     def __init__(self):
         self.attempts = {}
     
     def is_rate_limited(self, key: str, max_attempts: int = 5, window_minutes: int = 15) -> bool:
-        """Check if a key is rate limited"""
+        """Check if a key is rate limited (without recording a new attempt)."""
         now = datetime.now(timezone.utc)
         window_start = now - timedelta(minutes=window_minutes)
         
-        if key not in self.attempts:
-            self.attempts[key] = []
-        
-        # Clean old attempts
-        self.attempts[key] = [attempt for attempt in self.attempts[key] if attempt > window_start]
-        
-        if len(self.attempts[key]) >= max_attempts:
-            return True
-        
-        self.attempts[key].append(now)
-        return False
+        attempts = self.attempts.get(key, [])
+        attempts = [t for t in attempts if t > window_start]
+        self.attempts[key] = attempts
+        return len(attempts) >= max_attempts
+
+    def note_failure(self, key: str):
+        """Record a failed attempt for the given key."""
+        now = datetime.now(timezone.utc)
+        self.attempts.setdefault(key, []).append(now)
 
 rate_limiter = RateLimiter()
 
 def check_rate_limit(request: Request, max_attempts: int = 5, window_minutes: int = 15):
-    """Check rate limit for IP address"""
+    """Check rate limit for IP address without recording. Use note_failure() on failures."""
+    import os
+    # In development, relax/disable rate limiting
+    if os.getenv("ENVIRONMENT", "development").lower() in ("dev", "development"):
+        return
     ip = request.client.host
     if rate_limiter.is_rate_limited(ip, max_attempts, window_minutes):
         raise HTTPException(

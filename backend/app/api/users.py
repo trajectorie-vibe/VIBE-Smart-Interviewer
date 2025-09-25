@@ -80,7 +80,7 @@ async def update_user(
     # Update other allowed fields
     for field in (
         'email', 'candidate_name', 'candidate_id', 'client_name', 'role',
-        'preferred_language', 'language_code', 'is_active'
+        'preferred_language', 'language_code', 'is_active', 'age', 'gender'
     ):
         if field in update_data and update_data[field] is not None:
             setattr(user, field, update_data[field])
@@ -116,6 +116,8 @@ async def create_user(
         role=payload.role,
         preferred_language=payload.preferred_language,
         language_code=payload.language_code,
+        age=payload.age,
+        gender=payload.gender,
         tenant_id=tenant_id
     )
     db.add(user)
@@ -135,6 +137,18 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     if current_user.role != 'superadmin' and user.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden")
+    # Proactively remove dependent assignments to avoid ORM trying to NULL FKs
+    # Covers both roles: user as candidate and user as admin
+    try:
+        from app.models import UserAssignment, TestAssignment
+        # Delete user_assignments where the user is either the candidate or the admin
+        db.query(UserAssignment).filter((UserAssignment.user_id == user.id) | (UserAssignment.admin_id == user.id)).delete(synchronize_session=False)
+        # Delete test_assignments created by or assigned to the user
+        db.query(TestAssignment).filter((TestAssignment.user_id == user.id) | (TestAssignment.admin_id == user.id)).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        # Continue with delete; DB-level CASCADE may already handle it
     db.delete(user)
     db.commit()
     return {"message": "User deleted"}

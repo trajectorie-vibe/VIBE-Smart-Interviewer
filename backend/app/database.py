@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
-from typing import Generator
+from typing import Generator, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -98,6 +98,16 @@ def init_database():
     
     # Create all tables (idempotent)
     Base.metadata.create_all(bind=engine)
+
+    # Run lightweight, idempotent migrations for SQLite (adds missing columns like users.age/gender)
+    try:
+        if engine.dialect.name == "sqlite":
+            from app.db_migrations import run_migrations as run_sqlite_migrations
+            logger.info("Running lightweight SQLite migrations...")
+            run_sqlite_migrations(engine)
+            logger.info("SQLite migrations completed")
+    except Exception as mig_err:
+        logger.error(f"Error running lightweight migrations: {mig_err}")
 
     # Lightweight schema verification (additive safety net, not a full migration system)
     try:
@@ -189,14 +199,22 @@ def check_database_health() -> bool:
 # Database migration utilities
 def run_migrations():
     """Run database migrations (placeholder for Alembic)"""
-    # In production, you would use Alembic for migrations
-    # For now, we'll just ensure all tables exist
+    # In production, you would use Alembic for migrations.
+    # For now, ensure tables exist and run lightweight SQLite migrations.
     from app.models import Base
     Base.metadata.create_all(bind=engine)
-    logger.info("Database migrations completed (create_all idempotent run)")
+    if engine.dialect.name == "sqlite":
+        try:
+            from app.db_migrations import run_migrations as run_sqlite_migrations
+            run_sqlite_migrations(engine)
+            logger.info("Lightweight SQLite migrations executed successfully")
+        except Exception as mig_err:
+            logger.error(f"Error during lightweight SQLite migrations: {mig_err}")
+    else:
+        logger.info("Non-SQLite database detected; relying on create_all (or Alembic in prod)")
 
 # Backup utilities
-def backup_database(backup_path: str = None):
+def backup_database(backup_path: Optional[str] = None):
     """Backup database (SQLite only)"""
     if not DATABASE_URL.startswith("sqlite"):
         raise ValueError("Backup currently only supported for SQLite")
