@@ -190,3 +190,18 @@ def run_migrations(engine: Engine):
     migrate_assignment_tables(engine)
     migrate_enhanced_media_and_submissions(engine)
     ensure_user_tenant_ids(engine)
+    migrate_user_demographics(engine)
+
+
+def migrate_user_demographics(engine: Engine):
+    """Add optional age and gender columns to users table if missing."""
+    table = "users"
+    try:
+        if _column_missing(engine, table, "age"):
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN age INTEGER"))
+        if _column_missing(engine, table, "gender"):
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN gender VARCHAR(50)"))
+    except Exception as e:
+        logging.error(f"Error migrating user demographics: {e}")

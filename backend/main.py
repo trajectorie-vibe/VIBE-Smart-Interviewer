@@ -20,11 +20,11 @@ from app.database import get_db, init_database, check_database_health, db_config
 from app.db_migrations import run_migrations
 from app.auth import (
     auth_manager, get_current_user, get_current_active_user,
-    require_admin, require_superadmin, check_rate_limit
+    require_admin, require_superadmin, check_rate_limit, rate_limiter
 )
 from app.models import (
     LoginRequest, LoginResponse, RefreshTokenRequest,
-    UserCreate, UserResponse, UserUpdate
+    UserCreate, UserResponse, UserUpdate, User
 )
 from pydantic import BaseModel, EmailStr
 from app.api import api_router
@@ -222,8 +222,10 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """Authenticate user and return JWT tokens"""
-    # Rate limiting
-    check_rate_limit(request, max_attempts=5, window_minutes=15)
+    # Rate limiting (configurable via env)
+    max_attempts = int(os.getenv("LOGIN_RATE_LIMIT_MAX_ATTEMPTS", os.getenv("LOGIN_MAX_ATTEMPTS", "5")))
+    window_minutes = int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_MINUTES", os.getenv("LOGIN_WINDOW_MINUTES", "15")))
+    check_rate_limit(request, max_attempts=max_attempts, window_minutes=window_minutes)
     
     try:
         result = auth_manager.authenticate_user(
@@ -231,6 +233,12 @@ async def login(
         )
         
         if not result:
+            # Record only failed attempts (non-dev environment)
+            if os.getenv("ENVIRONMENT", "development").lower() not in ("dev", "development"):
+                try:
+                    rate_limiter.note_failure(request.client.host)
+                except Exception:
+                    pass
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
@@ -275,6 +283,8 @@ class RegisterRequest(BaseModel):
     candidate_name: str
     candidate_id: str
     client_name: str
+    age: int | None = None
+    gender: str | None = None
 
 @app.post("/auth/register", response_model=UserResponse)
 async def register_user(
@@ -340,6 +350,8 @@ async def register_user(
         role="candidate",
         preferred_language="en",
         language_code="en",
+        age=req.age,
+        gender=req.gender,
         tenant_id=system_tenant.id,
     )
 
@@ -351,7 +363,7 @@ async def register_user(
 
 @app.post("/auth/logout")
 async def logout(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Logout user and revoke session"""
@@ -368,7 +380,7 @@ async def logout(
         )
 
 @app.get("/auth/me", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_active_user)):
+async def get_current_user_info(current_user: User = Depends(get_current_active_user)):
     """Get current user information"""
     return current_user
 
@@ -377,7 +389,7 @@ async def get_current_user_info(current_user: dict = Depends(get_current_active_
 async def get_user_by_email(
     email: EmailStr = Path(..., description="User email address"),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin)
+    current_user: User = Depends(require_admin)
 ):
     """Lookup a user by email (admin or superadmin only)"""
     from app.models import User
@@ -397,7 +409,7 @@ async def get_user_by_email(
 async def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin)
+    current_user: User = Depends(require_admin)
 ):
     """Create a new user (admin only)"""
     from app.models import User
@@ -422,6 +434,8 @@ async def create_user(
         role=user_data.role,
         preferred_language=user_data.preferred_language,
         language_code=user_data.language_code,
+        age=getattr(user_data, 'age', None),
+        gender=getattr(user_data, 'gender', None),
         tenant_id=user_data.tenant_id or current_user.tenant_id
     )
     
@@ -437,7 +451,7 @@ async def list_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin)
+    current_user: User = Depends(require_admin)
 ):
     """List users (admin sees only assigned users, superadmin sees all)"""
     from app.models import User, UserAssignment
@@ -466,7 +480,7 @@ async def list_users(
 async def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get user by ID"""
     from app.models import User
@@ -509,7 +523,7 @@ async def update_user(
     user_id: str,
     user_update: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin)
+    current_user: User = Depends(require_admin)
 ):
     """Update user (admin only)"""
     from app.models import User
@@ -553,7 +567,7 @@ async def update_user(
 async def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_admin)
+    current_user: User = Depends(require_admin)
 ):
     """Delete user (admin only)"""
     from app.models import User
@@ -589,6 +603,14 @@ async def delete_user(
             detail="Cannot delete your own account"
         )
     
+    # Proactively remove dependent assignments to avoid FK integrity errors
+    try:
+        from app.models import UserAssignment, TestAssignment
+        db.query(UserAssignment).filter((UserAssignment.user_id == user.id) | (UserAssignment.admin_id == user.id)).delete(synchronize_session=False)
+        db.query(TestAssignment).filter((TestAssignment.user_id == user.id) | (TestAssignment.admin_id == user.id)).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
     db.delete(user)
     db.commit()
     

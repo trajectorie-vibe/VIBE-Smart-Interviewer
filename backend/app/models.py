@@ -58,6 +58,10 @@ class User(Base, TimestampMixin):
     client_name = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False)
     
+    # Demographics (optional)
+    age = Column(Integer)
+    gender = Column(String(50))
+    
     # Multi-language support
     preferred_language = Column(String(10), default='en')
     language_code = Column(String(10), default='en')
@@ -426,6 +430,8 @@ class UserBase(BaseModel):
     role: str = Field(..., pattern="^(superadmin|admin|candidate)$")
     preferred_language: str = "en"
     language_code: str = "en"
+    age: Optional[int] = None
+    gender: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
@@ -441,6 +447,8 @@ class UserUpdate(BaseModel):
     language_code: Optional[str] = None
     is_active: Optional[bool] = None
     tenant_id: Optional[uuid.UUID] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
 
 class UserResponse(UserBase):
     id: uuid.UUID
@@ -642,11 +650,13 @@ class BulkTestAssignmentRequest(BaseModel):
     # Accept user IDs as strings to be more permissive with client payloads;
     # the API will validate existence/role via database lookups.
     user_ids: List[str]
+    # Accept test_types case-insensitively and normalize server-side
     test_types: List[str] = Field(..., description="List of test types to assign (JDT, SJT)")
     due_date: Optional[datetime] = None
     max_attempts: int = 3
     notes: Optional[str] = None
-    sjt_scenario_ids: Optional[List[str]] = Field(
+    # Accept SJT scenario ids as strings or numbers from the client and coerce to strings server-side
+    sjt_scenario_ids: Optional[List[Any]] = Field(
         None,
         description="For SJT assignments, restrict to these scenario IDs (from tenant SJT config)."
     )

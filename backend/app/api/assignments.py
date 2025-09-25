@@ -175,6 +175,20 @@ async def bulk_assign_tests_to_users(
         if not requested_user_ids.issubset(assigned_user_ids):
             raise HTTPException(status_code=403, detail="Cannot assign tests to users not assigned to you")
     
+    # Normalize incoming fields
+    try:
+        normalized_test_types = [str(t).upper() for t in (request.test_types or [])]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid test_types format; expected a list of strings")
+
+    # Coerce scenario IDs to strings if provided
+    normalized_scenario_ids = None
+    if request.sjt_scenario_ids is not None:
+        try:
+            normalized_scenario_ids = [str(x) for x in request.sjt_scenario_ids]
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid sjt_scenario_ids; expected a list of strings or numbers")
+
     # Verify users exist
     users = db.query(User).filter(
         User.id.in_([str(uid) for uid in request.user_ids]),
@@ -185,9 +199,8 @@ async def bulk_assign_tests_to_users(
     
     created_assignments = []
     for user in users:
-        for test_type in request.test_types:
+        for test_type in normalized_test_types:
             # Normalize test type to uppercase to match constraint (JDT/SJT)
-            test_type = test_type.upper()
             if test_type not in ("JDT", "SJT"):
                 continue
             # Check if assignment already exists
@@ -215,8 +228,8 @@ async def bulk_assign_tests_to_users(
                 max_attempts=request.max_attempts,
                 notes=request.notes,
                 custom_config=(
-                    { 'sjt_scenario_ids': request.sjt_scenario_ids }
-                    if (test_type == 'SJT' and request.sjt_scenario_ids)
+                    { 'sjt_scenario_ids': normalized_scenario_ids }
+                    if (test_type == 'SJT' and normalized_scenario_ids)
                     else None
                 )
             )
