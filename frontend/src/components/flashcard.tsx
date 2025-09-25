@@ -86,8 +86,8 @@ const Flashcard: React.FC<FlashcardProps> = ({
   
   // Get timer value from props or use default for testing (answer timer, excludes reading time)
   const testTimerValue = questionTimeLimitInMinutes || 2;
-  // Dedicated reading time before answering begins (seconds)
-  const [readingTimeRemaining, setReadingTimeRemaining] = useState<number>(60);
+  // Dedicated reading time before answering begins (seconds) - configurable from admin settings
+  const [readingTimeRemaining, setReadingTimeRemaining] = useState<number>(prepTimeSeconds || 60);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaData, setMediaData] = useState<{ blob: Blob; dataUri: string } | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -182,8 +182,8 @@ const Flashcard: React.FC<FlashcardProps> = ({
         clearInterval(prepCountdownRef.current);
       }
 
-      // Initialize reading time countdown (e.g., 60s) and TTS during the reading phase
-      setReadingTimeRemaining(60);
+      // Initialize reading time countdown (configurable) and TTS during the reading phase
+      setReadingTimeRemaining(prepTimeSeconds || 60);
       const readingTimer = setInterval(() => {
         setReadingTimeRemaining(prev => {
           if (prev <= 1) {
@@ -593,7 +593,7 @@ const Flashcard: React.FC<FlashcardProps> = ({
                 <div className="flex items-center gap-6">
                     {testTimerValue && testTimerValue > 0 && (
                         <div className={`flex flex-col gap-1 ml-4`}>
-                            {/* Single continuous bar: left segment purple for reading, right for answering (orange->green) */}
+                            {/* Continuous progress bar: reading time (0 to readingDuration) + answering time (readingDuration to total) */}
                             <div className="flex items-center gap-3">
                               <div className="flex items-center gap-2 text-sm font-semibold">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7">
@@ -602,24 +602,66 @@ const Flashcard: React.FC<FlashcardProps> = ({
                                     <path d="M20 14a8 8 0 1 1-8-8 8 8 0 0 1 8 8Z"/>
                                     <path d="M7 15h5v5"/>
                                 </svg>
-                                {/* Show remaining time: during reading show reading time, otherwise show answer time */}
+                                {/* Show current phase and remaining time */}
                                 {readingTimeRemaining > 0
                                   ? `Reading | ${formatTime(readingTimeRemaining)}`
-                                  : `Time Remaining | ${formatTime(questionTimeRemaining || (testTimerValue*60))}`
+                                  : `Answering | ${formatTime(questionTimeRemaining || (testTimerValue*60))}`
                                 }
                               </div>
                             </div>
-                            <div className="w-80 h-3 bg-gray-300 rounded-full overflow-hidden">
-                              {/* Bar composed of two overlays using background gradients */}
-                              <div
-                                className="h-full transition-all duration-1000"
-                                style={{
-                                  background: readingTimeRemaining > 0
-                                    ? `linear-gradient(to right, rgba(128,0,128,0.9) ${Math.min(100, (readingTimeRemaining/60)*100)}%, rgba(255,165,0,0.9) ${Math.min(100, (readingTimeRemaining/60)*100)}%)`
-                                    : `linear-gradient(to right, rgba(34,197,94,0.9) ${Math.max(0, (questionTimeRemaining/(testTimerValue*60))*100)}%, rgba(229,231,235,1) ${Math.max(0, (questionTimeRemaining/(testTimerValue*60))*100)}%)`,
-                                  width: '100%'
-                                }}
-                              />
+                            <div className="w-80 h-3 bg-gray-300 rounded-full overflow-hidden relative">
+                              {(() => {
+                                const readingDuration = prepTimeSeconds || 60; // Use configurable reading time
+                                const answeringDuration = answerTimeSeconds || (testTimerValue * 60); // Use configurable answer time or fallback
+                                const totalDuration = readingDuration + answeringDuration;
+                                
+                                // Calculate current position on the continuous timeline
+                                let currentPosition = 0;
+                                if (readingTimeRemaining > 0) {
+                                  // During reading phase: progress from 0 to readingDuration
+                                  currentPosition = readingDuration - readingTimeRemaining;
+                                } else {
+                                  // During answering phase: progress from readingDuration to totalDuration
+                                  const answerTimeElapsed = answeringDuration - (questionTimeRemaining || answeringDuration);
+                                  currentPosition = readingDuration + answerTimeElapsed;
+                                }
+                                
+                                const progressPercentage = (currentPosition / totalDuration) * 100;
+                                const readingPercentage = (readingDuration / totalDuration) * 100;
+                                
+                                return (
+                                  <>
+                                    {/* Background segments to show reading vs answering sections */}
+                                    <div className="absolute inset-0 flex">
+                                      <div 
+                                        className="h-full bg-purple-200" 
+                                        style={{ width: `${readingPercentage}%` }}
+                                      />
+                                      <div 
+                                        className="h-full bg-orange-200" 
+                                        style={{ width: `${100 - readingPercentage}%` }}
+                                      />
+                                    </div>
+                                    
+                                    {/* Progress fill */}
+                                    <div
+                                      className="h-full transition-all duration-1000 relative z-10"
+                                      style={{
+                                        width: `${Math.min(100, Math.max(0, progressPercentage))}%`,
+                                        background: currentPosition <= readingDuration
+                                          ? 'linear-gradient(to right, #8B5CF6, #A855F7)' // Purple gradient for reading
+                                          : 'linear-gradient(to right, #8B5CF6, #A855F7, #F97316, #22C55E)' // Purple to orange to green for full progress
+                                      }}
+                                    />
+                                    
+                                    {/* Visual separator between reading and answering */}
+                                    <div 
+                                      className="absolute top-0 h-full w-0.5 bg-gray-600 z-20"
+                                      style={{ left: `${readingPercentage}%` }}
+                                    />
+                                  </>
+                                );
+                              })()}
                             </div>
                         </div>
                     )}

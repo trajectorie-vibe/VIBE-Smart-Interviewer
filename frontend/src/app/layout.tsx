@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/auth-context';
 import { LanguageProvider } from '@/contexts/language-context';
 import StorageNotification from '@/components/storage-notification';
 import UserList from '@/components/user-list';
+import GlobalApiErrorListener from '@/components/global-api-error-listener';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -51,6 +52,7 @@ export default function RootLayout({
               <div className="blob blob-3" />
             </div>
             <main className="relative z-10">
+              <GlobalApiErrorListener />
               {children}
             </main>
             <Toaster />

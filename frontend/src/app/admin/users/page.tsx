@@ -40,6 +40,8 @@ const UserManagementPage = () => {
     const [clientName, setClientName] = useState('');
     const [role, setRole] = useState('');
     const [userType, setUserType] = useState<'candidate' | 'admin' | 'superadmin'>('candidate');
+    const [age, setAge] = useState<string>('');
+    const [gender, setGender] = useState<string>('');
 
     const fetchUsers = async () => {
         try {
@@ -69,6 +71,8 @@ const UserManagementPage = () => {
         setClientName('');
         setRole('');
         setUserType('candidate');
+        setAge('');
+        setGender('');
     };
 
     const handleAddUser = async (e: React.FormEvent) => {
@@ -85,6 +89,8 @@ const UserManagementPage = () => {
                 // backend expects password in body for creation via admin path
                 // our apiService.createUser sends arbitrary fields; backend should accept password
                 password,
+                ...(age ? { age: Number(age) } : {}),
+                ...(gender ? { gender } : {}),
             } as any);
 
             if (result.data) {
@@ -179,6 +185,16 @@ const UserManagementPage = () => {
                                         <Label htmlFor="clientName">Company / Client Name</Label>
                                         <Input id="clientName" placeholder="e.g., TechCorp" required value={clientName} onChange={e => setClientName(e.target.value)} />
                                     </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="age">Age (optional)</Label>
+                                            <Input id="age" type="number" min={0} placeholder="e.g., 30" value={age} onChange={e => setAge(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="gender">Gender (optional)</Label>
+                                            <Input id="gender" placeholder="e.g., Male / Female / Non-binary / Prefer not to say" value={gender} onChange={e => setGender(e.target.value)} />
+                                        </div>
+                                    </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="userType">User Type</Label>
                                                                                 <Select value={userType} onValueChange={(value: 'candidate' | 'admin' | 'superadmin') => setUserType(value)}>
@@ -223,6 +239,8 @@ const UserManagementPage = () => {
                                         <TableRow>
                                             <TableHead>Name</TableHead>
                                             <TableHead>Email</TableHead>
+                                            <TableHead>Age</TableHead>
+                                            <TableHead>Gender</TableHead>
                                             <TableHead>Role</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
@@ -233,6 +251,8 @@ const UserManagementPage = () => {
                                                                                                 <TableRow key={u.id}>
                                                                                                         <TableCell className="font-medium">{u.candidate_name}</TableCell>
                                                                                                         <TableCell>{u.email}</TableCell>
+                                                    <TableCell>{u.age ?? '-'}</TableCell>
+                                                    <TableCell>{u.gender ?? '-'}</TableCell>
                                                     <TableCell>
                                                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                                                                                                                 u.role === 'superadmin' ? 'bg-purple-100 text-purple-800' :

@@ -18,6 +18,8 @@ export default function RegisterPage() {
   const [candidateName, setCandidateName] = useState('');
   const [candidateId, setCandidateId] = useState('');
   const [clientName, setClientName] = useState('');
+  const [age, setAge] = useState<string>('');
+  const [gender, setGender] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const { toast } = useToast();
@@ -46,6 +48,9 @@ export default function RegisterPage() {
         candidate_name: candidateName.trim(),
         candidate_id: candidateId.trim(),
         client_name: clientName.trim(),
+        // Pass optional demographics when provided
+        ...(age ? { age: Number(age) } : {}),
+        ...(gender ? { gender } : {}),
       });
 
       console.log('Registration result:', success);
@@ -107,6 +112,16 @@ export default function RegisterPage() {
                         <Label htmlFor="clientName">Company / Client Name</Label>
                         <Input id="clientName" placeholder="TechCorp" required value={clientName} onChange={e => setClientName(e.target.value)} />
                     </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="age">Age (optional)</Label>
+              <Input id="age" type="number" min={0} placeholder="e.g., 28" value={age} onChange={e => setAge(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender (optional)</Label>
+              <Input id="gender" placeholder="e.g., Female / Male / Non-binary / Prefer not to say" value={gender} onChange={e => setGender(e.target.value)} />
+            </div>
+          </div>
                     
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">

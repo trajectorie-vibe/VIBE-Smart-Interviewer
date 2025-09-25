@@ -36,13 +36,14 @@ interface TestSettings {
   timeLimit: number; // in minutes, 0 for no limit
   numberOfQuestions: number;
   aiGeneratedQuestions: number;
+  requireGdprConsent?: boolean;
 }
 
 const JDConfigPage = () => {
   const { toast } = useToast();
   const [roles, setRoles] = useState<RoleConfig[]>([]);
   const [currentRoleId, setCurrentRoleId] = useState<number | null>(null);
-  const [settings, setSettings] = useState<TestSettings>({ timeLimit: 0, numberOfQuestions: 5, aiGeneratedQuestions: 0 });
+  const [settings, setSettings] = useState<TestSettings>({ timeLimit: 0, numberOfQuestions: 5, aiGeneratedQuestions: 0, requireGdprConsent: true });
 
   const addRole = () => {
     const newId = getUniqueId();
@@ -75,6 +76,7 @@ const JDConfigPage = () => {
                 timeLimit: savedSettings.timeLimit || 0,
                 numberOfQuestions: savedSettings.numberOfQuestions || 5,
                 aiGeneratedQuestions: savedSettings.aiGeneratedQuestions || 0,
+                requireGdprConsent: savedSettings.requireGdprConsent !== undefined ? savedSettings.requireGdprConsent : true,
             });
           }
         } else {
@@ -227,6 +229,18 @@ const JDConfigPage = () => {
                             />
                             <p className="text-xs text-muted-foreground">Number of questions to generate using AI. 0 for none.</p>
                         </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">GDPR consent required</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="gdpr-required"
+                  type="checkbox"
+                  checked={!!settings.requireGdprConsent}
+                  onChange={(e) => setSettings(s => ({ ...s, requireGdprConsent: e.target.checked }))}
+                />
+                <span className="text-sm text-muted-foreground">Show GDPR consent gate to candidates before JDT starts</span>
+              </div>
+            </div>
                     </CardContent>
                 </Card>
 

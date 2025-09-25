@@ -47,6 +47,8 @@ interface TestSettings {
   reRecordLimit?: number;
   ttsEnabled?: boolean;
   ttsVoice?: string;
+  // New: camera readiness gate
+  cameraCheckEnabled?: boolean;
 }
 
 
@@ -66,7 +68,8 @@ const SJTConfigPage = () => {
     answerTimeSeconds: 90,
     reRecordLimit: 1,
     ttsEnabled: true,
-    ttsVoice: ''
+    ttsVoice: '',
+    cameraCheckEnabled: true
   });
 
 
@@ -104,7 +107,8 @@ const SJTConfigPage = () => {
            answerTimeSeconds: typeof savedSettings.answerTimeSeconds === 'number' ? savedSettings.answerTimeSeconds : 90,
                 reRecordLimit: typeof savedSettings.reRecordLimit === 'number' ? savedSettings.reRecordLimit : 1,
            ttsEnabled: typeof savedSettings.ttsEnabled === 'boolean' ? savedSettings.ttsEnabled : true,
-           ttsVoice: typeof savedSettings.ttsVoice === 'string' ? savedSettings.ttsVoice : ''
+           ttsVoice: typeof savedSettings.ttsVoice === 'string' ? savedSettings.ttsVoice : '',
+           cameraCheckEnabled: typeof savedSettings.cameraCheckEnabled === 'boolean' ? savedSettings.cameraCheckEnabled : true
              });
           }
         } else {
@@ -197,15 +201,56 @@ const SJTConfigPage = () => {
       <Header />
       <div className="container mx-auto px-4 sm:px-8 py-8">
         <header className="mb-8">
-          <h1 className="text-4xl font-headline text-primary flex items-center gap-4">
-            <FileCog className="h-10 w-10" />
-            Situational Judgement Test (SJT) Configuration
-          </h1>
-          <p className="text-muted-foreground">Create scenarios and manage global settings for the SJT.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-headline text-primary flex items-center gap-4">
+                <FileCog className="h-10 w-10" />
+                SJT Configuration Dashboard
+              </h1>
+              <p className="text-muted-foreground">Create scenarios and manage global settings for the Situational Judgement Test.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right text-sm">
+                <p className="font-medium">{scenarios.length} Scenarios Created</p>
+                <p className="text-muted-foreground">
+                  Est. Test Duration: {settings.prepTimeSeconds || 60}s reading + {settings.answerTimeSeconds || 90}s per question
+                </p>
+              </div>
+            </div>
+          </div>
         </header>
+        
         <main>
           <form onSubmit={handleSubmit}>
             <div className="space-y-8">
+              
+              {/* Quick Actions Bar */}
+              <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-4">
+                  <Button 
+                    type="button" 
+                    onClick={addScenario} 
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add New Scenario
+                  </Button>
+                  
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">Total Questions:</span> {scenarios.length}
+                    {settings.numberOfQuestions > 0 && settings.numberOfQuestions !== scenarios.length && 
+                      <span className="ml-2 text-orange-600">
+                        (Will use {Math.min(settings.numberOfQuestions, scenarios.length)} random scenarios)
+                      </span>
+                    }
+                  </div>
+                </div>
+                
+                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Save All Changes
+                </Button>
+              </div>
                 <Card className="bg-card/60 backdrop-blur-xl">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Settings />Test Settings</CardTitle>
@@ -274,18 +319,32 @@ const SJTConfigPage = () => {
                             />
                             <p className="text-xs text-muted-foreground">Percentage penalty applied when follow-up questions are generated.</p>
                         </div>
-            <div className="space-y-2">
-              <Label htmlFor="prep-time" className="flex items-center gap-2"><Clock /> Prep Time (seconds)</Label>
-              <Input
-                id="prep-time"
-                type="number"
-                min="0"
-                value={settings.prepTimeSeconds ?? 0}
-                onChange={(e) => setSettings(s => ({ ...s, prepTimeSeconds: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
-                placeholder="e.g., 10"
-              />
-              <p className="text-xs text-muted-foreground">Time to prepare before recording starts automatically.</p>
-            </div>
+            
+            {/* Continuous Timer Configuration Section */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-4">
+              <h4 className="font-semibold text-blue-900 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Continuous Timer Settings
+              </h4>
+              <p className="text-sm text-blue-800">
+                Configure the continuous timer bar that shows reading time (0 to prep time) + answering time (prep time to total).
+                The timer flows smoothly from purple (reading) to orange/green (answering).
+              </p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="prep-time" className="flex items-center gap-2"><Clock /> Reading/Prep Time (seconds)</Label>
+                <Input
+                  id="prep-time"
+                  type="number"
+                  min="0"
+                  value={settings.prepTimeSeconds ?? 0}
+                  onChange={(e) => setSettings(s => ({ ...s, prepTimeSeconds: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
+                  placeholder="e.g., 60"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Time for candidates to read and prepare before answering begins. This appears as the purple section of the continuous timer bar.
+                </p>
+              </div>
             <div className="space-y-2 flex items-center gap-2">
               <input
                 id="auto-start"
@@ -296,8 +355,9 @@ const SJTConfigPage = () => {
               />
               <Label htmlFor="auto-start">Auto-start Recording after Prep</Label>
             </div>
+            
             <div className="space-y-2">
-              <Label htmlFor="answer-time" className="flex items-center gap-2"><Clock /> Answer Time (seconds)</Label>
+              <Label htmlFor="answer-time" className="flex items-center gap-2"><Clock /> Answering Time (seconds)</Label>
               <Input
                 id="answer-time"
                 type="number"
@@ -306,8 +366,32 @@ const SJTConfigPage = () => {
                 onChange={(e) => setSettings(s => ({ ...s, answerTimeSeconds: Math.max(0, parseInt(e.target.value, 10) || 0) }))}
                 placeholder="e.g., 90"
               />
-              <p className="text-xs text-muted-foreground">If set, recording will auto-stop and submit when time is up.</p>
+              <p className="text-xs text-muted-foreground">
+                Time for candidates to record their answer. This appears as the orange/green section of the continuous timer bar.
+                If set, recording will auto-stop and submit when time is up.
+              </p>
             </div>
+          </div>
+          {/* Camera Check Settings */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
+            <h4 className="font-semibold text-green-900 flex items-center gap-2">
+              Video Readiness Check
+            </h4>
+            <div className="space-y-2 flex items-center gap-2">
+              <input
+                id="camera-check-enabled"
+                type="checkbox"
+                className="h-4 w-4"
+                checked={!!settings.cameraCheckEnabled}
+                onChange={(e) => setSettings(s => ({ ...s, cameraCheckEnabled: e.target.checked }))}
+              />
+              <Label htmlFor="camera-check-enabled">Require camera readiness check before starting</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, candidates must pass a quick webcam check (framing, lighting, background motion) after GDPR and before the test begins.
+            </p>
+          </div>
+          {/* End Continuous Timer Configuration Section */}
             <div className="space-y-2">
               <Label htmlFor="rerecord-limit">Re-record Limit</Label>
               <Input
@@ -347,15 +431,53 @@ const SJTConfigPage = () => {
 
                 <Card className="bg-card/60 backdrop-blur-xl">
                 <CardHeader>
-                    <CardTitle>SJT Scenarios</CardTitle>
-                    <CardDescription>
-                    Define the situations, questions, and rationale for best/worst responses to guide AI analysis. Each scenario can assess multiple competencies by listing them separated by commas. The number of scenarios you create here will be the number of questions in the test.
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <BrainCircuit className="h-5 w-5" />
+                          SJT Scenarios ({scenarios.length})
+                        </CardTitle>
+                        <CardDescription>
+                          Define the situations, questions, and rationale for best/worst responses to guide AI analysis. 
+                          Each scenario can assess multiple competencies by listing them separated by commas.
+                        </CardDescription>
+                      </div>
+                      <Button 
+                        type="button" 
+                        onClick={addScenario} 
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Scenario
+                      </Button>
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-          {scenarios.map((scenario, index) => (
-                    <div key={scenario.id} className="p-4 border rounded-md space-y-4 relative bg-secondary/30">
-                        <h3 className="font-semibold text-primary">Scenario {index + 1}</h3>
+          {scenarios.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <BrainCircuit className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-2">No scenarios created yet</p>
+              <p>Click "Add Scenario" to create your first SJT question.</p>
+            </div>
+          ) : (
+            scenarios.map((scenario, index) => (
+                    <div key={scenario.id} className="p-6 border-2 rounded-lg space-y-4 relative bg-gradient-to-r from-white to-gray-50 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-primary text-lg">
+                            Scenario {index + 1}
+                            {scenario.name && <span className="text-sm font-normal text-muted-foreground ml-2">({scenario.name})</span>}
+                          </h3>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeScenario(scenario.id)}
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
             <div className="space-y-2">
               <Label htmlFor={`name-${scenario.id}`}>Scenario Name (optional)</Label>
               <Input id={`name-${scenario.id}`} placeholder="e.g., Handling a Difficult Customer" value={scenario.name || ''} onChange={(e) => handleScenarioChange(scenario.id, 'name' as any, e.target.value)} />
@@ -460,11 +582,17 @@ const SJTConfigPage = () => {
                         </Button>
                         )}
                     </div>
-                    ))}
-                    <Button variant="outline" onClick={addScenario} type="button">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add Another Scenario
-                    </Button>
+                    ))
+                  )}
+                  
+                  {scenarios.length > 0 && (
+                    <div className="text-center">
+                      <Button variant="outline" onClick={addScenario} type="button" className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700">
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Add Another Scenario
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
                 </Card>
             </div>
