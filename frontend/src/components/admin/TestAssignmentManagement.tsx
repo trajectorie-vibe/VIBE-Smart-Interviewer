@@ -66,7 +66,8 @@ export default function TestAssignmentManagement() {
   const fetchAssignedUsers = async () => {
     try {
       const token = (typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null) || localStorage.getItem('access_token');
-      const response = await fetch(`${API_BASE}/users`, {
+      // Corrected endpoint to include /api/v1 prefix
+      const response = await fetch(`${API_BASE}/api/v1/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {

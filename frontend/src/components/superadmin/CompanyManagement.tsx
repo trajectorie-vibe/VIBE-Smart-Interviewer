@@ -91,13 +91,32 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
 
   const handleCreateCompany = async (companyData: Partial<Tenant>) => {
     try {
+      console.log('Creating company with data:', companyData);
+      console.log('Logo URL present:', !!companyData.logo_url);
+      console.log('Logo URL type:', typeof companyData.logo_url);
+      if (companyData.logo_url) {
+        console.log('Logo URL length:', companyData.logo_url.length);
+        console.log('Logo URL preview:', companyData.logo_url.substring(0, 100) + '...');
+      }
+      
       const result = await apiService.createTenant(companyData);
+      console.log('Create company result:', result);
+      
       if (result.data) {
         await loadCompanies();
         setShowCreateModal(false);
+        console.log('Company created successfully');
+        alert('Company created successfully!');
+      } else if (result.error) {
+        console.error('Company creation failed:', result.error);
+        alert(`Failed to create company: ${result.error}`);
+      } else {
+        console.error('Unexpected result:', result);
+        alert('Unexpected response from server');
       }
     } catch (error) {
       console.error('Error creating company:', error);
+      alert(`Error creating company: ${error}`);
     }
   };
 
@@ -105,14 +124,33 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
     if (!selectedCompany) return;
     
     try {
+      console.log('Updating company with data:', companyData);
+      console.log('Logo URL present:', !!companyData.logo_url);
+      console.log('Logo URL type:', typeof companyData.logo_url);
+      if (companyData.logo_url) {
+        console.log('Logo URL length:', companyData.logo_url.length);
+        console.log('Logo URL preview:', companyData.logo_url.substring(0, 100) + '...');
+      }
+      
       const result = await apiService.updateTenant(selectedCompany.id, companyData);
+      console.log('Update company result:', result);
+      
       if (result.data) {
         await loadCompanies();
         setShowEditModal(false);
         setSelectedCompany(null);
+        console.log('Company updated successfully');
+        alert('Company updated successfully!');
+      } else if (result.error) {
+        console.error('Company update failed:', result.error);
+        alert(`Failed to update company: ${result.error}`);
+      } else {
+        console.error('Unexpected result:', result);
+        alert('Unexpected response from server');
       }
     } catch (error) {
       console.error('Error updating company:', error);
+      alert(`Error updating company: ${error}`);
     }
   };
 
@@ -415,12 +453,37 @@ function CreateCompanyModal({ onClose, onSubmit }: {
                 accept="image/*"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (!file) { setFormData({ ...formData, logo_url: undefined }); return; }
+                  if (!file) { 
+                    console.log('No file selected, clearing logo_url');
+                    setFormData({ ...formData, logo_url: undefined }); 
+                    return; 
+                  }
+                  
+                  console.log('File selected:', file.name, file.type, file.size, 'bytes');
+                  
+                  if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                    alert('File size too large. Please select an image under 5MB.');
+                    return;
+                  }
+                  
+                  if (!file.type.startsWith('image/')) {
+                    alert('Please select a valid image file.');
+                    return;
+                  }
+                  
                   const reader = new FileReader();
                   reader.onload = () => {
                     if (typeof reader.result === 'string') {
+                      console.log('FileReader success. Data URI length:', reader.result.length);
+                      console.log('Data URI preview:', reader.result.substring(0, 100) + '...');
                       setFormData({ ...formData, logo_url: reader.result });
+                    } else {
+                      console.error('FileReader result is not a string:', typeof reader.result);
                     }
+                  };
+                  reader.onerror = () => {
+                    console.error('FileReader error:', reader.error);
+                    alert('Failed to read the selected file. Please try again.');
                   };
                   reader.readAsDataURL(file);
                 }}
@@ -563,12 +626,37 @@ function EditCompanyModal({ company, onClose, onSubmit }: {
                 accept="image/*"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (!file) { setFormData({ ...formData, logo_url: undefined }); return; }
+                  if (!file) { 
+                    console.log('No file selected, clearing logo_url');
+                    setFormData({ ...formData, logo_url: undefined }); 
+                    return; 
+                  }
+                  
+                  console.log('File selected:', file.name, file.type, file.size, 'bytes');
+                  
+                  if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                    alert('File size too large. Please select an image under 5MB.');
+                    return;
+                  }
+                  
+                  if (!file.type.startsWith('image/')) {
+                    alert('Please select a valid image file.');
+                    return;
+                  }
+                  
                   const reader = new FileReader();
                   reader.onload = () => {
                     if (typeof reader.result === 'string') {
+                      console.log('FileReader success. Data URI length:', reader.result.length);
+                      console.log('Data URI preview:', reader.result.substring(0, 100) + '...');
                       setFormData({ ...formData, logo_url: reader.result });
+                    } else {
+                      console.error('FileReader result is not a string:', typeof reader.result);
                     }
+                  };
+                  reader.onerror = () => {
+                    console.error('FileReader error:', reader.error);
+                    alert('Failed to read the selected file. Please try again.');
                   };
                   reader.readAsDataURL(file);
                 }}

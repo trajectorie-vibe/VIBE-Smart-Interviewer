@@ -27,6 +27,8 @@ export interface User {
   last_login?: string;
   created_at: string;
   updated_at: string;
+  age?: number | null;
+  gender?: string | null;
 }
 
 export interface Tenant {
@@ -110,11 +112,19 @@ class FastAPIService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
+    // Diagnostic logging for tracing API calls
+    if (typeof window !== 'undefined') {
+      console.log(`[apiService] → ${options.method || 'GET'} ${url}`);
+    }
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string,string> || {}),
-    };
+    const method = (options.method || 'GET').toUpperCase();
+    const hasBody = typeof (options as any).body !== 'undefined' && (options as any).body !== null;
+    const baseHeaders: Record<string, string> = (options.headers as Record<string,string> || {});
+    const headers: Record<string, string> = { ...baseHeaders };
+    // Only set Content-Type for requests with a body (POST/PUT/PATCH/DELETE). For GET/HEAD, omit to avoid CORS preflight.
+    if (hasBody && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     // Add authorization header if token exists
     if (this.accessToken) {
@@ -126,6 +136,9 @@ class FastAPIService {
         ...options,
         headers,
       });
+      if (typeof window !== 'undefined') {
+        console.log(`[apiService] ← ${response.status} ${url}`);
+      }
 
       if (response.status === 401 && this.refreshToken) {
         // Try to refresh token
@@ -147,20 +160,51 @@ class FastAPIService {
         } else {
           // Refresh failed, redirect to login
           this.logout();
+          // Emit a global error toast on the client
+          if (typeof window !== 'undefined') {
+            const detail = { status: 401, message: 'Session expired. Please log in again.', endpoint };
+            window.dispatchEvent(new CustomEvent('global-api-error', { detail }));
+          }
           throw new Error('Session expired');
         }
       }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        return { error: errorData.detail || errorData.error || 'Request failed' };
+        if (typeof window !== 'undefined') {
+          console.error(`[apiService] ✖ ${response.status} ${url}`, errorData);
+        }
+        // Derive a user-friendly error message and emit a global error event for toasts
+        let message: string = (errorData && (errorData.detail || errorData.error || errorData.message)) || 'Request failed';
+        // Normalize FastAPI validation error format
+        if (Array.isArray(errorData?.detail)) {
+          const first = errorData.detail[0];
+          if (first?.msg) message = first.msg;
+        }
+        // Special-case duplicates
+        if (response.status === 409) {
+          const text = JSON.stringify(errorData).toLowerCase();
+          if (text.includes('email')) message = 'A user with this email already exists.';
+          else if (text.includes('candidate_id')) message = 'This candidate ID is already in use.';
+          else message = 'Duplicate resource. It already exists.';
+        }
+        if (typeof window !== 'undefined') {
+          const detail = { status: response.status, message, endpoint };
+          window.dispatchEvent(new CustomEvent('global-api-error', { detail }));
+        }
+        return { error: message };
       }
 
       const data = await response.json();
       return { data };
     } catch (error) {
-      console.error('API request failed:', error);
-      return { error: error instanceof Error ? error.message : 'Network error' };
+      console.error(`[apiService] Network/Fetch failed ${url}:`, error);
+      const message = error instanceof Error ? error.message : 'Network error';
+      if (typeof window !== 'undefined') {
+        const detail = { status: 0, message, endpoint };
+        window.dispatchEvent(new CustomEvent('global-api-error', { detail }));
+      }
+      return { error: message };
     }
   }
 
@@ -439,6 +483,13 @@ class FastAPIService {
   }
 
   // Assignments
+  async getTestAssignments(params?: { user_id?: string; test_type?: string }): Promise<ApiResponse<any[]>> {
+    const query = params ? '?' + new URLSearchParams(
+      Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
+    ).toString() : '';
+    return this.request<any[]>(`/api/v1/assignments/tests${query}`);
+  }
+
   async bulkAssignTests(payload: {
     user_ids: string[];
     test_types: string[];

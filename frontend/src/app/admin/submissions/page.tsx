@@ -5,7 +5,7 @@ import { ProtectedRoute, useAuth } from '@/contexts/auth-context';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileSearch, ArrowLeft, Eye, Trash2, AlertTriangle, Download, Video, Mic, Type, Loader2 } from 'lucide-react';
+import { FileSearch, ArrowLeft, Eye, Trash2, AlertTriangle, Download, Video, Mic, Type, Loader2, FileText } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/components/header';
 import type { Submission } from '@/types';
@@ -101,7 +101,11 @@ export default function AdminSubmissionsPage() {
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
-  const [downloadFormat, setDownloadFormat] = useState<'video' | 'audio'>('video');
+  const [downloadFormats, setDownloadFormats] = useState<{ text: boolean; video: boolean; audio: boolean }>({
+    text: true,
+    video: true,
+    audio: false
+  });
   const [extractingAudio, setExtractingAudio] = useState<Record<string, boolean>>({});
 
   // Load submissions from FastAPI
@@ -173,103 +177,193 @@ export default function AdminSubmissionsPage() {
     }
   };
 
-  // Download submission
+  // Download submission with multiple format support
   const handleDownload = async (submission: Submission) => {
     const submissionId = submission.id;
     
+    if (!downloadFormats.text && !downloadFormats.video && !downloadFormats.audio) {
+      toast({
+        title: "No Format Selected",
+        description: "Please select at least one download format (Text, Video, or Audio).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setDownloading(prev => ({ ...prev, [submissionId]: true }));
       
-      console.log(`📥 Starting download for submission: ${submissionId}`);
-      let videoBlob: Blob | null = null;
-      let sourceHint = '';
+      console.log(`📥 Starting multi-format download for submission: ${submissionId}`);
+      const downloads: { name: string; blob: Blob; extension: string }[] = [];
 
-      // 1) Try backend media list
-      try {
-        const mediaRes = await apiService.listSubmissionMedia(submissionId);
-        const files = mediaRes.data || [];
-        // Prefer last video; fallback to audio
-        const videoFile = [...files].reverse().find((f: any) => (f.file_type || '').toLowerCase().includes('video'))
-          || [...files].reverse().find((f: any) => (f.file_type || '').toLowerCase().includes('webm'))
-          || null;
-        const audioFile = [...files].reverse().find((f: any) => (f.file_type || '').toLowerCase().includes('audio')) || null;
-        const chosen = videoFile || audioFile;
-        if (chosen) {
-          const url = chosen.storage_url || chosen.file_path || chosen.url;
-          if (url) {
-            sourceHint = 'storage';
-            videoBlob = await downloadFromStorage(url);
+      // 1. Download text report if selected
+      if (downloadFormats.text) {
+        try {
+          const textContent = JSON.stringify({
+            submissionId: submission.id,
+            candidateName: submission.candidateName,
+            testType: submission.testType,
+            createdAt: submission.createdAt,
+            report: submission.report,
+            history: submission.history?.map(entry => ({
+              question: entry.question,
+              answer: entry.answer,
+              // Don't include media data URIs in text export for size
+            })),
+            competencies: submission.competencies
+          }, null, 2);
+          
+          const textBlob = new Blob([textContent], { type: 'application/json' });
+          downloads.push({
+            name: `submission_${submissionId}_report`,
+            blob: textBlob,
+            extension: '.json'
+          });
+          console.log(`✅ Text report prepared (${textBlob.size} bytes)`);
+        } catch (textError) {
+          console.warn('Failed to prepare text report:', textError);
+        }
+      }
+
+      // 2. Download video/audio media if selected
+      if (downloadFormats.video || downloadFormats.audio) {
+        try {
+          let videoBlob: Blob | null = null;
+          let sourceHint = '';
+
+          // Try backend media list
+          try {
+            const mediaRes = await apiService.listSubmissionMedia(submissionId);
+            const files = mediaRes.data || [];
+            const videoFile = [...files].reverse().find((f: any) => (f.file_type || '').toLowerCase().includes('video'))
+              || [...files].reverse().find((f: any) => (f.file_type || '').toLowerCase().includes('webm'))
+              || null;
+            const audioFile = [...files].reverse().find((f: any) => (f.file_type || '').toLowerCase().includes('audio')) || null;
+            
+            const chosen = videoFile || audioFile;
+            if (chosen) {
+              const url = chosen.storage_url || chosen.file_path || chosen.url;
+              if (url) {
+                sourceHint = 'storage';
+                videoBlob = await downloadFromStorage(url);
+              }
+            }
+          } catch (e) {
+            console.warn('Media list fetch failed, falling back to history:', e);
+          }
+
+          // Fallback to history
+          if (!videoBlob) {
+            if (!submission.history || submission.history.length === 0) {
+              throw new Error('No media found for this submission');
+            }
+            const latestEntry = submission.history[submission.history.length - 1];
+            if (!latestEntry.videoDataUri) {
+              throw new Error('No media URL or data URI in submission history');
+            }
+            const videoDataUri = latestEntry.videoDataUri;
+            console.log(`📥 Using history ${videoDataUri.startsWith('data:') ? 'data URI' : 'URL'}`);
+            sourceHint = videoDataUri.startsWith('data:') ? 'data-uri' : 'url';
+            if (videoDataUri.startsWith('data:')) {
+              const response = await fetch(videoDataUri);
+              videoBlob = await response.blob();
+            } else {
+              videoBlob = await downloadFromStorage(videoDataUri);
+            }
+          }
+          
+          if (!videoBlob) {
+            throw new Error('Unable to obtain media blob');
+          }
+          console.log(`✅ Media blob obtained from ${sourceHint}: ${videoBlob.size} bytes, type: ${videoBlob.type}`);
+
+          // Add video if selected
+          if (downloadFormats.video) {
+            downloads.push({
+              name: `submission_${submissionId}_video`,
+              blob: videoBlob,
+              extension: '.webm'
+            });
+          }
+
+          // Add audio if selected
+          if (downloadFormats.audio) {
+            try {
+              setExtractingAudio(prev => ({ ...prev, [submissionId]: true }));
+              console.log(`🎵 Extracting audio from video blob (${videoBlob.size} bytes)`);
+              
+              const audioBlob = await extractAudioFromVideo(videoBlob);
+              downloads.push({
+                name: `submission_${submissionId}_audio`,
+                blob: audioBlob,
+                extension: '.wav'
+              });
+              
+              console.log(`✅ Audio extraction completed: ${audioBlob.size} bytes`);
+            } catch (audioError) {
+              console.error('❌ Audio extraction failed:', audioError);
+              throw new Error(`Failed to extract audio: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`);
+            } finally {
+              setExtractingAudio(prev => ({ ...prev, [submissionId]: false }));
+            }
+          }
+        } catch (mediaError) {
+          console.warn('Failed to download media:', mediaError);
+          // Don't fail completely if media fails but text succeeded
+          if (!downloadFormats.text) {
+            throw mediaError;
           }
         }
-      } catch (e) {
-        console.warn('Media list fetch failed, falling back to history:', e);
       }
 
-      // 2) Fallback to history latest entry videoDataUri
-      if (!videoBlob) {
-        if (!submission.history || submission.history.length === 0) {
-          throw new Error('No media found for this submission');
-        }
-        const latestEntry = submission.history[submission.history.length - 1];
-        if (!latestEntry.videoDataUri) {
-          throw new Error('No media URL or data URI in submission history');
-        }
-        const videoDataUri = latestEntry.videoDataUri;
-        console.log(`📥 Using history ${videoDataUri.startsWith('data:') ? 'data URI' : 'URL'}`);
-        sourceHint = videoDataUri.startsWith('data:') ? 'data-uri' : 'url';
-        if (videoDataUri.startsWith('data:')) {
-          const response = await fetch(videoDataUri);
-          videoBlob = await response.blob();
-        } else {
-          videoBlob = await downloadFromStorage(videoDataUri);
-        }
+      // 3. Create downloads
+      if (downloads.length === 0) {
+        throw new Error('No content could be prepared for download');
       }
-      
-      if (!videoBlob) {
-        throw new Error('Unable to obtain media blob');
-      }
-      console.log(`✅ Media blob obtained from ${sourceHint}: ${videoBlob.size} bytes, type: ${videoBlob.type}`);
 
-      // Handle format conversion if needed
-      let finalBlob = videoBlob;
-      let fileName = `submission_${submissionId}`;
-      let fileExtension = '.webm';
-      
-      if (downloadFormat === 'audio') {
-        try {
-          setExtractingAudio(prev => ({ ...prev, [submissionId]: true }));
-          console.log(`🎵 Extracting audio from video blob (${videoBlob.size} bytes)`);
-          
-          finalBlob = await extractAudioFromVideo(videoBlob);
-          fileExtension = '.wav';
-          fileName += '_audio';
-          
-          console.log(`✅ Audio extraction completed: ${finalBlob.size} bytes`);
-        } catch (audioError) {
-          console.error('❌ Audio extraction failed:', audioError);
-          throw new Error(`Failed to extract audio: ${audioError instanceof Error ? audioError.message : 'Unknown error'}`);
-        } finally {
-          setExtractingAudio(prev => ({ ...prev, [submissionId]: false }));
-        }
+      // If single download, download directly
+      if (downloads.length === 1) {
+        const download = downloads[0];
+        const url = URL.createObjectURL(download.blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = download.name + download.extension;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log(`✅ Single download completed: ${download.name}${download.extension}`);
       } else {
-        fileName += '_video';
+        // Multiple downloads - create a ZIP file
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
+        
+        for (const download of downloads) {
+          zip.file(download.name + download.extension, download.blob);
+        }
+        
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `submission_${submissionId}_bundle.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log(`✅ Multi-format ZIP download completed: ${downloads.map(d => d.name + d.extension).join(', ')}`);
       }
 
-      // Create download link
-      const url = URL.createObjectURL(finalBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName + fileExtension;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      console.log(`✅ Download completed: ${fileName}${fileExtension}`);
+      const formatsList = [];
+      if (downloadFormats.text) formatsList.push('Text Report');
+      if (downloadFormats.video) formatsList.push('Video');
+      if (downloadFormats.audio) formatsList.push('Audio');
 
       toast({
         title: "Success",
-        description: `${downloadFormat === 'audio' ? 'Audio' : 'Video'} downloaded successfully`,
+        description: `${formatsList.join(' + ')} downloaded successfully`,
         variant: "default",
       });
 
@@ -285,6 +379,7 @@ export default function AdminSubmissionsPage() {
       setExtractingAudio(prev => ({ ...prev, [submissionId]: false }));
     }
   };
+
 
   if (loading) {
     return (
@@ -339,16 +434,30 @@ export default function AdminSubmissionsPage() {
                   <div className="flex items-center gap-4">
                     <Label className="flex items-center gap-2">
                       <Checkbox 
-                        checked={downloadFormat === 'video'}
-                        onCheckedChange={() => setDownloadFormat('video')}
+                        checked={downloadFormats.text}
+                        onCheckedChange={(checked) => 
+                          setDownloadFormats(prev => ({ ...prev, text: checked === true }))
+                        }
+                      />
+                      <FileText className="h-4 w-4" />
+                      Text Report
+                    </Label>
+                    <Label className="flex items-center gap-2">
+                      <Checkbox 
+                        checked={downloadFormats.video}
+                        onCheckedChange={(checked) => 
+                          setDownloadFormats(prev => ({ ...prev, video: checked === true }))
+                        }
                       />
                       <Video className="h-4 w-4" />
                       Video
                     </Label>
                     <Label className="flex items-center gap-2">
                       <Checkbox 
-                        checked={downloadFormat === 'audio'}
-                        onCheckedChange={() => setDownloadFormat('audio')}
+                        checked={downloadFormats.audio}
+                        onCheckedChange={(checked) => 
+                          setDownloadFormats(prev => ({ ...prev, audio: checked === true }))
+                        }
                       />
                       <Mic className="h-4 w-4" />
                       Audio

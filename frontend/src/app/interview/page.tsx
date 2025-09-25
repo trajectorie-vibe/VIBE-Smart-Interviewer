@@ -53,13 +53,15 @@ function VerbalInterviewPage() {
   const [canTakeTest, setCanTakeTest] = useState(true);
   const [checkingAttempts, setCheckingAttempts] = useState(true);
   const [gdprAccepted, setGdprAccepted] = useState<boolean>(false);
+  const [requireGdprConsent, setRequireGdprConsent] = useState<boolean>(true);
+  // Dynamic attempts (replaces fixed MAX_ATTEMPTS)
+  const [maxAttempts, setMaxAttempts] = useState<number>(1);
+  const [attemptsUsed, setAttemptsUsed] = useState<number>(0);
   
   // 🔒 MINIMAL IMPACT RECOVERY STATE - Only used if feature enabled
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryData, setRecoveryData] = useState<SessionRecovery | null>(null);
   
-  const MAX_ATTEMPTS = 1;
-
   // Check if user can take the test
   useEffect(() => {
     // Read GDPR consent flag once on mount
@@ -70,15 +72,48 @@ function VerbalInterviewPage() {
       setGdprAccepted(false);
     }
 
+    // Load dynamic attempt limits from assignments and previous submissions
+    (async () => {
+      if (!user) return;
+      try {
+        const { apiService } = await import('@/lib/api-service');
+        // Fetch JDT assignments for the user
+        const assignments = await apiService.getTestAssignments({ user_id: (user as any).id, test_type: 'JDT' });
+        if (assignments.data && assignments.data.length) {
+          const relevant = assignments.data.filter((a: any) => a.test_type === 'JDT');
+          if (relevant.length) {
+            const maxFromAssignments = relevant.reduce((m: number, a: any) => typeof a.max_attempts === 'number' ? Math.max(m, a.max_attempts) : m, 1);
+            setMaxAttempts(maxFromAssignments || 1);
+          }
+        }
+        // Count prior submissions (attempts already used)
+        const subs = await apiService.getSubmissions({ user_id: (user as any).id, test_type: 'JDT' });
+        if (subs.data) {
+          setAttemptsUsed(Array.isArray(subs.data) ? subs.data.length : 0);
+        }
+      } catch (e) {
+        console.warn('Could not load dynamic attempt data for JDT; defaulting to 1', e);
+        setMaxAttempts(1);
+      }
+    })();
+
     const checkAttempts = async () => {
       try {
-        const canTake = await canUserTakeTest('JDT', MAX_ATTEMPTS);
+        // Load JDT config to determine GDPR requirement
+        try {
+          const jdtConfig = await configurationService.getJDTConfig();
+          const require = jdtConfig?.settings?.requireGdprConsent;
+          setRequireGdprConsent(require !== undefined ? !!require : true);
+        } catch {
+          setRequireGdprConsent(true);
+        }
+        const canTake = await canUserTakeTest('JDT', maxAttempts);
         setCanTakeTest(canTake);
         if (!canTake) {
           toast({
             variant: 'destructive',
             title: 'Maximum Attempts Reached',
-            description: `You have already completed the maximum number of attempts (${MAX_ATTEMPTS}) for this test.`,
+            description: `You have already completed the maximum number of attempts (${maxAttempts}) for this test.`,
           });
         }
       } catch (error) {
@@ -90,7 +125,7 @@ function VerbalInterviewPage() {
     };
 
     checkAttempts();
-  }, [canUserTakeTest, toast]);
+  }, [canUserTakeTest, toast, user, maxAttempts]);
 
   const handleGdprAccept = () => {
     try {
@@ -466,8 +501,8 @@ function VerbalInterviewPage() {
 
 
   const renderContent = () => {
-    // Gate the flow with GDPR consent screen before language selection
-    if (!gdprAccepted) {
+    // Gate the flow with GDPR consent screen if required by admin configuration
+    if (requireGdprConsent && !gdprAccepted) {
       return (
         <div className="w-full max-w-5xl">
           <GDPRConsent onAccept={handleGdprAccept} />
@@ -587,7 +622,7 @@ function VerbalInterviewPage() {
                     </div>
                     <h2 className="text-2xl font-headline text-red-600 mb-2">Access Restricted</h2>
                     <p className="text-muted-foreground mb-6">
-                      You have reached the maximum number of attempts ({MAX_ATTEMPTS}) for this test. 
+                      You have reached the maximum number of attempts ({maxAttempts}) for this test. 
                       Please contact your administrator if you need additional attempts.
                     </p>
                     <Button onClick={() => router.push('/')} variant="outline">

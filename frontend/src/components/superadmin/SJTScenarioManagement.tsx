@@ -24,6 +24,7 @@ export default function SJTScenarioManagement() {
   const [expandedScenario, setExpandedScenario] = useState<string | number | null>(null);
   const [loading, setLoading] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [maxAttempts, setMaxAttempts] = useState<number>(1);
   // Superadmin now works directly with global scenarios (no company filter)
 
   useEffect(() => {
@@ -116,12 +117,16 @@ export default function SJTScenarioManagement() {
       toast({ variant: 'destructive', title: 'Pick scenarios', description: 'Select one or more scenarios to assign.' });
       return;
     }
+    if (!Number.isFinite(maxAttempts) || maxAttempts < 1) {
+      toast({ variant: 'destructive', title: 'Invalid attempts', description: 'Please enter a valid number of attempts (minimum 1).' });
+      return;
+    }
     setAssigning(true);
     try {
       const payload = {
         user_ids: Array.from(selectedUserIds),
         test_types: ['SJT'],
-        max_attempts: 1,
+        max_attempts: maxAttempts,
         sjt_scenario_ids: Array.from(selectedScenarioIds),
       };
       const res = await apiService.bulkAssignTests(payload);
@@ -197,6 +202,25 @@ export default function SJTScenarioManagement() {
               <div className="flex items-center gap-2 mb-3">
                 <Input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search candidates…"/>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <Label htmlFor="maxAttempts">Max attempts per candidate</Label>
+                  <Input
+                    id="maxAttempts"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={10}
+                    value={Number.isFinite(maxAttempts) ? String(maxAttempts) : ''}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value || '');
+                      if (Number.isFinite(v)) setMaxAttempts(Math.max(1, Math.min(10, v)));
+                      else setMaxAttempts(1);
+                    }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Candidates can attempt SJT up to this many times.</p>
+                </div>
+              </div>
               <div className="flex items-center gap-3 mb-2 text-sm">
                 <button className="text-blue-600 hover:underline" onClick={toggleAllUsers}>{allUsersSelected ? 'Unselect all' : 'Select all (filtered)'}</button>
                 {selectedUserIds.size > 0 && (
@@ -223,8 +247,14 @@ export default function SJTScenarioManagement() {
                 <div className="flex items-center text-sm text-gray-500 mt-2"><Loader2 className="h-4 w-4 mr-2 animate-spin"/>Loading all candidates…</div>
               )}
               <div className="mt-4">
-                <Button onClick={assign} disabled={assigning || selectedUserIds.size === 0 || selectedScenarioIds.size === 0} className="w-full">
-                  {assigning ? 'Assigning…' : (<span className="flex items-center gap-2"><Send className="h-4 w-4"/>Assign SJT to {selectedUserIds.size} user(s)</span>)}
+                <Button onClick={assign} disabled={assigning || selectedUserIds.size === 0 || selectedScenarioIds.size === 0 || !Number.isFinite(maxAttempts) || maxAttempts < 1} className="w-full">
+                  {assigning ? 'Assigning…' : (
+                    <span className="flex items-center gap-2">
+                      <Send className="h-4 w-4"/>
+                      Assign SJT to {selectedUserIds.size} user(s)
+                      <span className="text-xs text-gray-600">(max {maxAttempts} attempt{maxAttempts === 1 ? '' : 's'})</span>
+                    </span>
+                  )}
                 </Button>
               </div>
             </CardContent>

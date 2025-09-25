@@ -15,7 +15,7 @@ interface AuthContextType {
   login: ((credentials: LoginCredentials) => Promise<boolean>) & ((email: string, password: string) => Promise<boolean>);
   logout: () => void;
   refreshUser: () => Promise<void>;
-  register: (details: { email: string; password: string; candidate_name: string; candidate_id: string; client_name: string; }) => Promise<boolean>;
+  register: (details: { email: string; password: string; candidate_name: string; candidate_id: string; client_name: string; age?: number; gender?: string; }) => Promise<boolean>;
   isAuthenticated: boolean;
   isSuperAdmin: boolean;
   isAdmin: boolean;
@@ -77,7 +77,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
-      const creds: LoginCredentials = typeof arg1 === 'string' ? { email: arg1, password: arg2 || '' } : arg1;
+      // Normalize email to avoid case/whitespace mismatches with backend lookup
+      const raw: LoginCredentials = typeof arg1 === 'string' ? { email: arg1, password: arg2 || '' } : arg1;
+      const creds: LoginCredentials = { email: raw.email.trim().toLowerCase(), password: raw.password };
       const result = await apiService.login(creds);
       
       if (result.data) {
@@ -96,12 +98,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const register = async (details: { email: string; password: string; candidate_name: string; candidate_id: string; client_name: string; }): Promise<boolean> => {
+  const register = async (details: { email: string; password: string; candidate_name: string; candidate_id: string; client_name: string; age?: number; gender?: string; }): Promise<boolean> => {
     // Normalize email client-side
-    const payload = { ...details, email: details.email.trim().toLowerCase() };
-    
+  const payload = { ...details, email: details.email.trim().toLowerCase() };
+
     console.log('auth-context register() called with:', payload.email);
-    
+
     if (loading) {
       console.log('Already loading, preventing duplicate submission');
       // Prevent duplicate submission while already processing
@@ -116,23 +118,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      
+
       console.log('Response status:', res.status);
-      
+
       if (res.ok) {
         console.log('Registration successful');
         setLoading(false);
         return true;
       }
-      // Handle duplicate (treat as soft success so UI can message appropriately)
+      const err = await res.json().catch(() => ({} as any));
+      const detail = (err && (err.detail || err.error)) || '';
       if (res.status === 409) {
-        console.log('Registration failed: duplicate email');
+        // Duplicate (email or candidate_id+client_name)
+        const msg = detail || 'An account with these details already exists.';
+        setError(msg);
         setLoading(false);
-        return false; // caller can distinguish via context error if needed
+        return false;
       }
-      const err = await res.json().catch(() => ({}));
-      console.log('Registration failed with error:', err);
-      setError(err.detail || 'Registration failed');
+      const msg = detail || `Registration failed (HTTP ${res.status})`;
+      setError(msg);
       setLoading(false);
       return false;
     } catch (e) {
