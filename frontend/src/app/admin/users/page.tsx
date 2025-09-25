@@ -190,10 +190,19 @@ const UserManagementPage = () => {
                                             <Label htmlFor="age">Age (optional)</Label>
                                             <Input id="age" type="number" min={0} placeholder="e.g., 30" value={age} onChange={e => setAge(e.target.value)} />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="gender">Gender (optional)</Label>
-                                            <Input id="gender" placeholder="e.g., Male / Female / Non-binary / Prefer not to say" value={gender} onChange={e => setGender(e.target.value)} />
-                                        </div>
+                                                                                <div className="space-y-2">
+                                                                                        <Label htmlFor="gender">Gender (optional)</Label>
+                                                                                        <Select value={gender} onValueChange={(v)=> setGender(v)}>
+                                                                                            <SelectTrigger id="gender">
+                                                                                                <SelectValue placeholder="Select gender" />
+                                                                                            </SelectTrigger>
+                                                                                            <SelectContent>
+                                                                                                <SelectItem value="Male">Male</SelectItem>
+                                                                                                <SelectItem value="Female">Female</SelectItem>
+                                                                                                <SelectItem value="Other">Other</SelectItem>
+                                                                                            </SelectContent>
+                                                                                        </Select>
+                                                                                </div>
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="userType">User Type</Label>

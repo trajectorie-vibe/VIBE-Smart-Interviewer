@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       // Legacy support: Interview type with analysisInput provided
       console.log('🤖 Processing interview with provided analysisInput');
       analysisResult = await analyzeConversation(analysisInput);
-    } else if (type === 'interview') {
+  } else if (type === 'interview') {
       // New approach: Get submission from FastAPI with Firestore fallback
       let submission;
       
@@ -88,6 +88,37 @@ export async function POST(request: NextRequest) {
         jobDescription: '', // Default since we don't store this in submission
       };
       
+      // Enrich with competency definitions from DB to improve prompt grounding
+      try {
+        const compsRes = await apiService.listCompetencies({ include_inactive: false });
+        const comps = compsRes.data || [];
+        // Map competency names/codes to descriptions
+        const nameToDesc = new Map<string, string>();
+        const codeToDesc = new Map<string, string>();
+        for (const c of comps as any[]) {
+          const name = c.competency_name ? String(c.competency_name).trim().toLowerCase() : '';
+          const code = c.competency_code ? String(c.competency_code).trim().toLowerCase() : '';
+          const desc = c.competency_description ? String(c.competency_description) : '';
+          if (name) nameToDesc.set(name, desc);
+          if (code) codeToDesc.set(code, desc);
+        }
+        // Attach descriptions into preferredAnswer to guide the model
+        builtAnalysisInput.conversationHistory = builtAnalysisInput.conversationHistory.map((qa: any) => {
+          const key = (qa.competency || '').toString().trim().toLowerCase();
+          const dbDesc = nameToDesc.get(key) || codeToDesc.get(key);
+          if (dbDesc) {
+            const existing = qa.preferredAnswer ? String(qa.preferredAnswer) + ' ' : '';
+            return {
+              ...qa,
+              preferredAnswer: `${existing}(Admin-defined competency description: ${dbDesc})`
+            };
+          }
+          return qa;
+        });
+      } catch (e) {
+        console.warn('⚠️ Could not enrich interview analysis with competency definitions:', e);
+      }
+
       analysisResult = await analyzeConversation(builtAnalysisInput);
     } else if (type === 'sjt') {
       // SJT analysis with FastAPI and Firestore fallback

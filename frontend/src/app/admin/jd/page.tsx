@@ -14,6 +14,7 @@ import Link from 'next/link';
 import Header from '@/components/header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { configurationService } from '@/lib/config-service';
+import { apiService } from '@/lib/api-service';
 
 const getUniqueId = () => Date.now() + Math.random();
 
@@ -22,7 +23,7 @@ interface QuestionConfig {
   id: number;
   text: string;
   preferredAnswer: string;
-  competency: string;
+  competency: string; // store competency code here
 }
 
 interface RoleConfig {
@@ -44,6 +45,7 @@ const JDConfigPage = () => {
   const [roles, setRoles] = useState<RoleConfig[]>([]);
   const [currentRoleId, setCurrentRoleId] = useState<number | null>(null);
   const [settings, setSettings] = useState<TestSettings>({ timeLimit: 0, numberOfQuestions: 5, aiGeneratedQuestions: 0, requireGdprConsent: true });
+  const [competencyOptions, setCompetencyOptions] = useState<Array<{ code: string; name: string; label: string }>>([]);
 
   const addRole = () => {
     const newId = getUniqueId();
@@ -89,7 +91,25 @@ const JDConfigPage = () => {
       }
     };
 
+    const loadCompetencies = async () => {
+      try {
+        const res = await apiService.listCompetencies({ include_inactive: false });
+        const items = (res.data || []) as any[];
+        const opts = items
+          .filter((c) => c && (c.competency_name || c.competency_code))
+          .map((c) => {
+            const code = String(c.competency_code || '').trim();
+            const name = String(c.competency_name || code).trim();
+            return { code, name, label: code ? `${code}: ${name}` : name };
+          });
+        setCompetencyOptions(opts);
+      } catch (e) {
+        console.warn('⚠️ Could not load competencies for JDT');
+      }
+    };
+
     loadConfiguration();
+    loadCompetencies();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -333,14 +353,26 @@ const JDConfigPage = () => {
                                     />
                                 </div>
                                 <div>
-                                    <Label htmlFor={`competency-${q.id}`} className="text-sm font-medium">Competency Assessed</Label>
+                                  <Label htmlFor={`competency-${q.id}`} className="text-sm font-medium">Competency (code)</Label>
+                                  <div className="flex gap-2 items-center">
+                                    <Select value={q.competency} onValueChange={(val) => handleQuestionChange(currentRole.id, q.id, 'competency', val)}>
+                                      <SelectTrigger id={`competency-${q.id}`} className="w-[320px]">
+                                        <SelectValue placeholder="Pick competency (code: name)" />
+                                      </SelectTrigger>
+                                      <SelectContent className="max-h-64 overflow-y-auto">
+                                        {competencyOptions.map((opt, i) => (
+                                          <SelectItem key={`${opt.code}-${i}`} value={opt.code}>{opt.label}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
                                     <Input
-                                    id={`competency-${q.id}`}
-                                    placeholder={`e.g., "Strategic Thinking"`}
-                                    value={q.competency}
-                                    onChange={(e) => handleQuestionChange(currentRole.id, q.id, 'competency', e.target.value)}
-                                    required
+                                      value={q.competency}
+                                      onChange={(e) => handleQuestionChange(currentRole.id, q.id, 'competency', e.target.value)}
+                                      placeholder="Or paste code"
+                                      className="w-40"
                                     />
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">Stored as code to map consistently to definitions.</p>
                                 </div>
                             </div>
                             {currentQuestions.length > 1 && (
