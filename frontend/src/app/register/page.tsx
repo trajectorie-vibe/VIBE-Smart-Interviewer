@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Loader2, UserPlus } from 'lucide-react';
@@ -119,7 +120,16 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="gender">Gender (optional)</Label>
-              <Input id="gender" placeholder="e.g., Female / Male / Non-binary / Prefer not to say" value={gender} onChange={e => setGender(e.target.value)} />
+              <Select value={gender} onValueChange={(v)=> setGender(v)}>
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
                     

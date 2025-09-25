@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, ClipboardList, Target, Users, ListChecks, Trash2 } from 'lucide-react';
 import { configurationService } from '@/lib/config-service';
+import { apiService } from '@/lib/api-service';
 
 interface User {
   id: string;
@@ -65,18 +66,13 @@ export default function TestAssignmentManagement() {
 
   const fetchAssignedUsers = async () => {
     try {
-      const token = (typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null) || localStorage.getItem('access_token');
-      // Corrected endpoint to include /api/v1 prefix
-      const response = await fetch(`${API_BASE}/api/v1/users`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Filter to show only candidates
-        setUsers(data.filter((user: User) => user.role === 'candidate'));
-      }
+      // Load only users visible to this admin; backend enforces tenant + assignment scoping
+      const res = await apiService.getUsers({ role: 'candidate', is_active: true, limit: 5000 });
+      const list = (res.data?.users || []).filter((u: any) => (u.role || '').toLowerCase() === 'candidate');
+      setUsers(list as any);
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      console.error('Failed to fetch users for this admin:', error);
+      setUsers([]);
     }
   };
 
@@ -158,6 +154,17 @@ export default function TestAssignmentManagement() {
           ? Array.from(selectedScenarioIds).map(id => String(id))
           : undefined,
       };
+
+      // Guard: Prevent assigning SJT if no scenarios exist in config
+      if (payload.test_types.includes('SJT')) {
+        const cfg = await configurationService.getSJTConfig();
+        const scenarioCount = (cfg?.scenarios || []).length;
+        if (scenarioCount === 0) {
+          toast({ variant: 'destructive', title: 'SJT not configured', description: 'Please add SJT scenarios in Admin → SJT before assigning.' });
+          setLoading(false);
+          return;
+        }
+      }
 
       const response = await fetch(`${API_BASE}/api/v1/assignments/tests/bulk`, {
         method: 'POST',

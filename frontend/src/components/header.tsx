@@ -56,8 +56,25 @@ export default function Header() {
 
                 <div className="flex-grow"></div>
                 
-             <div className="flex flex-none items-center justify-end space-x-4">
-                 <Image src={tenantLogo || 'https://placehold.co/100x30.png'} alt="Client Logo" width={100} height={30} data-ai-hint="logo" />
+                         <div className="flex flex-none items-center justify-end space-x-4">
+                                 {tenantLogo ? (
+                                     <img
+                                         src={tenantLogo}
+                                         alt="Client Logo"
+                                         width={100}
+                                         height={30}
+                                         className="h-[30px] w-[100px] object-contain"
+                                         data-ai-hint="logo"
+                                     />
+                                 ) : (
+                                     <Image
+                                         src={'https://placehold.co/100x30.png'}
+                                         alt="Client Logo"
+                                         width={100}
+                                         height={30}
+                                         data-ai-hint="logo"
+                                     />
+                                 )}
                      <span className="text-sm text-muted-foreground hidden sm:inline">|</span>
                      
                      {/* Language Selector - Header shows ALL languages, independent of admin config */}

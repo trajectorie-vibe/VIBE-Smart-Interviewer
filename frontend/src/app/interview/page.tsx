@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ProtectedRoute, useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 import type { ConversationEntry, AnalysisResult, PreInterviewDetails, InterviewMode, Submission } from '@/types';
@@ -499,6 +499,20 @@ function VerbalInterviewPage() {
   const currentEntry = conversationHistory[currentQuestionIndex];
   const answeredQuestionsCount = conversationHistory.filter(entry => entry.answer !== null).length;
 
+  // Derive competency coverage for simple progress display (parity with SJT style)
+  const competencyProgress = useMemo(() => {
+    const totals = new Map<string, { total: number; answered: number }>();
+    for (const q of conversationHistory) {
+      const key = (q.competency || 'General').trim();
+      if (!totals.has(key)) totals.set(key, { total: 0, answered: 0 });
+      const v = totals.get(key)!;
+      v.total += 1;
+      if (q.answer && q.answer !== null && String(q.answer).trim() !== '') v.answered += 1;
+    }
+    // Stable order by competency name
+    return Array.from(totals.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [conversationHistory]);
+
 
   const renderContent = () => {
     // Gate the flow with GDPR consent screen if required by admin configuration
@@ -525,6 +539,25 @@ function VerbalInterviewPage() {
         }
         return (
           <div className="w-full max-w-6xl flex flex-col items-center">
+            {/* Competency coverage bar */}
+            {competencyProgress.length > 0 && (
+              <div className="w-full mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {competencyProgress.map(([name, v]) => {
+                  const pct = v.total > 0 ? Math.round((v.answered / v.total) * 100) : 0;
+                  return (
+                    <div key={name} className="rounded-md border p-3 bg-card/60">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium">{name}</span>
+                        <span className="text-muted-foreground">{v.answered}/{v.total}</span>
+                      </div>
+                      <div className="h-2 w-full bg-muted rounded">
+                        <div className="h-2 bg-primary rounded" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <Flashcard
               key={currentQuestionIndex}
               question={currentEntry.question}

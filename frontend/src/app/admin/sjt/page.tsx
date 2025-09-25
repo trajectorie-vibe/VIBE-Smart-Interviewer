@@ -55,7 +55,7 @@ interface TestSettings {
 const SJTConfigPage = () => {
   const { toast } = useToast();
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [competencyOptions, setCompetencyOptions] = useState<Array<{ name: string; code?: string }>>([]);
+  const [competencyOptions, setCompetencyOptions] = useState<Array<{ name: string; code: string; label: string }>>([]);
   const [settings, setSettings] = useState<TestSettings>({ 
     timeLimit: 0, 
     numberOfQuestions: 5, 
@@ -127,7 +127,11 @@ const SJTConfigPage = () => {
         const items = (res.data || []) as any[];
         const opts = items
           .filter((c) => c && (c.competency_name || c.competency_code))
-          .map((c) => ({ name: String(c.competency_name || c.competency_code), code: c.competency_code }));
+          .map((c) => {
+            const code = String(c.competency_code || '').trim();
+            const name = String(c.competency_name || code).trim();
+            return { code, name, label: code ? `${code}: ${name}` : name };
+          });
         setCompetencyOptions(opts);
         console.log(`📚 Loaded ${opts.length} competencies for SJT selector`);
       } catch (e) {
@@ -184,13 +188,17 @@ const SJTConfigPage = () => {
     }
   };
 
-  // Insert selected competency from dropdown into the comma-separated input, avoiding duplicates
-  const insertCompetency = (id: number, picked: string) => {
+  // Insert selected competency (by code) from dropdown into the comma-separated input, avoiding duplicates
+  const insertCompetency = (id: number, pickedCode: string) => {
     setScenarios(prev => prev.map(s => {
       if (s.id !== id) return s;
-      const current = (s.assessedCompetency || '').split(',').map(x => x.trim()).filter(Boolean);
-      if (!current.map(c => c.toLowerCase()).includes(picked.toLowerCase())) {
-        current.push(picked);
+      const current = (s.assessedCompetency || '')
+        .split(',')
+        .map(x => x.trim())
+        .filter(Boolean);
+      // Always store competency codes; UI will display code: name in dropdown
+      if (!current.map(c => c.toLowerCase()).includes(pickedCode.toLowerCase())) {
+        current.push(pickedCode);
       }
       return { ...s, assessedCompetency: current.join(', ') };
     }));
@@ -517,8 +525,8 @@ const SJTConfigPage = () => {
                                 </SelectTrigger>
                                 <SelectContent className="max-h-64 overflow-y-auto">
                                   {competencyOptions.map((opt, i) => (
-                                    <SelectItem key={`${opt.code || opt.name}-${i}`} value={opt.name}>
-                                      {opt.name}
+                                    <SelectItem key={`${opt.code}-${i}`} value={opt.code}>
+                                      {opt.label}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
