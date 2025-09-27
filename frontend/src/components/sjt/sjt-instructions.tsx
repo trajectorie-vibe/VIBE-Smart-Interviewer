@@ -63,9 +63,9 @@ export function SJTInstructions({ onProceed }: SJTInstructionsProps) {
       } catch (error) {
         console.error('Error loading SJT configuration:', error);
         // Set defaults if there's an error
-        setAvailableLanguages(['English']);
-        setLanguage('English');
-  setSettings({ timeLimit: 0, numberOfQuestions: 5 });
+    setAvailableLanguages(['English']);
+    setLanguage('English');
+    setSettings({ timeLimit: 0, numberOfQuestions: 5, answerTimeSeconds: 0 });
   setHasFollowUps(false);
       }
     };
@@ -85,10 +85,10 @@ export function SJTInstructions({ onProceed }: SJTInstructionsProps) {
   return (
     <div className="w-full max-w-5xl mx-auto animate-fadeIn p-4">
       <div className="text-center mb-6">
-  <h1 className="text-3xl font-semibold text-foreground">Welcome to</h1>
+  <h1 className="text-3xl font-semibold text-foreground">{t('assessment.title')}</h1>
   <h2 className="text-4xl font-bold text-gray-800 mt-1">Situational Judgement</h2>
-  <p className="text-gray-600 mt-2 text-base">No ideal answers! Be yourself.</p>
-  <p className="text-gray-600 font-semibold text-base">Choose what you would <span className="text-red-600">really</span> do, not what you should ideally do.</p>
+  <p className="text-gray-600 mt-2 text-base">{t('instructions.noRightWrong')}</p>
+  <p className="text-gray-600 font-semibold text-base">{t('flashcard.instructions.r3')}</p>
       </div>
       
         <Card className="bg-card border-border mb-6 shadow-lg overflow-hidden">
@@ -108,15 +108,15 @@ export function SJTInstructions({ onProceed }: SJTInstructionsProps) {
                     <div className="bg-accent text-accent-foreground p-6 flex flex-col justify-between items-center text-center w-full md:w-1/4 border-x border-border">
                         <div className="w-full">
                             <h3 className="font-bold text-lg mb-2">{t('common.questions').toUpperCase()}</h3>
-                            <div className="space-y-2 self-start text-left">
-                                <QuestionDetailItem>Situation based questions</QuestionDetailItem>
-                                <QuestionDetailItem>Record video/audio answers with real-time transcription</QuestionDetailItem>
-                                <QuestionDetailItem>{t('assessment.selectResponse')}</QuestionDetailItem>
-                            </div>
+              <div className="space-y-2 self-start text-left">
+                <QuestionDetailItem>{t('flashcard.situation')}</QuestionDetailItem>
+                <QuestionDetailItem>{t('recorder.rtaEnabled')}</QuestionDetailItem>
+                <QuestionDetailItem>{t('assessment.selectResponse')}</QuestionDetailItem>
+              </div>
                         </div>
                          <div className="w-full border-t border-white/50 my-4"></div>
                         <div className="w-full">
-               <p className="text-sm">Per Question Time</p>
+               <p className="text-sm">{t('flashcard.timeRemaining')}</p>
                <p className="font-bold text-lg -mt-1">
                {`Reading 1:00 + Answering ${settings.answerTimeSeconds ? `${Math.floor(settings.answerTimeSeconds/60)}:${(settings.answerTimeSeconds%60).toString().padStart(2,'0')}` : 'no limit'}`}
                </p>

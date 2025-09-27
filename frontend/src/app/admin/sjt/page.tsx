@@ -625,7 +625,7 @@ const SJTConfigPage = () => {
 
 const ProtectedSJTConfigPage = () => {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowedRoles={["superadmin"]}>
       <SJTConfigPage />
     </ProtectedRoute>
   )

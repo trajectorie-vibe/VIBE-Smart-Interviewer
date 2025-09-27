@@ -3,8 +3,10 @@ Tenants API endpoints for multi-tenant management
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import csv, io
 import json
 import uuid
 
@@ -13,8 +15,9 @@ from app.auth import get_current_active_user, require_superadmin, UserContext
 from app.models import (
     Tenant, TenantCreate, TenantResponse,
     User, UserCreate, UserResponse,
-    BulkUserGenerateRequest, BulkUserGenerateResponse, GeneratedCredential
+    BulkUserGenerateRequest, BulkUserGenerateResponse, GeneratedCredential, StatusEvent
 )
+from app.utils.ids import get_next_code
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -52,6 +55,17 @@ async def create_tenant(
         db.add(new_tenant)
         db.commit()
         db.refresh(new_tenant)
+        try:
+            db.add(StatusEvent(
+                event_type="tenant_created",
+                message=f"Company '{new_tenant.name}' created",
+                tenant_id=new_tenant.id,
+                actor_user_id=current_user.id,
+                payload={"tenant_id": str(new_tenant.id)}
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
 
     # Prepare response: parse allowed_test_types from JSON string
     try:
@@ -315,6 +329,17 @@ async def create_tenant_user(
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
+        try:
+            db.add(StatusEvent(
+                event_type="user_created",
+                message=f"User '{new_user.email}' added",
+                tenant_id=new_user.tenant_id,
+                actor_user_id=current_user.id,
+                payload={"user_id": str(new_user.id)}
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
     
     return new_user
 
@@ -381,6 +406,102 @@ async def generate_tenant_users(
     db.commit()
 
     return BulkUserGenerateResponse(created=created_count, credentials=credentials)
+
+@router.post("/{tenant_id}/users/import")
+async def import_users_csv(
+    tenant_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Bulk upload candidate users from CSV. Admin limited to own tenant. All fields mandatory.
+    CSV headers: email,password,candidate_name,candidate_id,client_name,phone_number
+    Empty rows ignored. Existing emails skipped.
+    """
+    # Permission checks
+    if current_user.role not in ("admin","superadmin"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == "admin" and str(current_user.tenant_id) != tenant_id:
+        raise HTTPException(status_code=403, detail="Admins can import only for their tenant")
+    try:
+        tid = str(uuid.UUID(tenant_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+    reader = csv.DictReader(io.StringIO(text))
+    required = ["email","password","candidate_name","candidate_id","client_name","phone_number"]
+    from app.auth import get_password_hash
+    created, skipped = 0, []
+    with UserContext(db, current_user):
+        for row in reader:
+            # skip empty rows
+            if not any((v or "").strip() for v in row.values()):
+                continue
+            # validate
+            missing = [f for f in required if not (row.get(f) or "").strip()]
+            if missing:
+                skipped.append({"row": row, "reason": f"missing required fields: {', '.join(missing)}"})
+                continue
+            email = row["email"].strip().lower()
+            existing = db.query(User).filter(User.email == email).first()
+            if existing:
+                skipped.append({"row": row, "reason": "duplicate email"})
+                continue
+            user = User(
+                email=email,
+                password_hash=get_password_hash(row["password"].strip()),
+                candidate_name=row["candidate_name"].strip(),
+                candidate_id=row["candidate_id"].strip(),
+                client_name=row["client_name"].strip(),
+                role="candidate",
+                preferred_language="en",
+                language_code="en",
+                phone_number=row["phone_number"].strip(),
+                tenant_id=tid
+            )
+            try:
+                user.user_code = get_next_code(db, 'users', 'user_code', 'C')
+            except Exception:
+                pass
+            db.add(user)
+            created += 1
+        db.commit()
+    return {"created": created, "skipped": skipped}
+
+@router.get("/{tenant_id}/users/export")
+async def export_tenant_users_csv(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role not in ("admin","superadmin"):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if current_user.role == "admin" and str(current_user.tenant_id) != tenant_id:
+        raise HTTPException(status_code=403, detail="Admins can export only their tenant")
+    try:
+        tid = str(uuid.UUID(tenant_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid tenant ID format")
+    users = db.query(User).filter(User.tenant_id == tid).order_by(User.created_at.asc()).all()
+    header = ["email","candidate_name","candidate_id","client_name","role","phone_number","user_code","created_at"]
+    import csv, io
+    output = io.StringIO()
+    w = csv.DictWriter(output, fieldnames=header)
+    w.writeheader()
+    for u in users:
+        w.writerow({
+            "email": u.email,
+            "candidate_name": u.candidate_name,
+            "candidate_id": u.candidate_id,
+            "client_name": u.client_name,
+            "role": u.role,
+            "phone_number": u.phone_number or "",
+            "user_code": u.user_code or "",
+            "created_at": u.created_at
+        })
+    return {"csv": output.getvalue()}
 
 @router.get("/{tenant_id}/statistics")
 async def get_tenant_statistics(

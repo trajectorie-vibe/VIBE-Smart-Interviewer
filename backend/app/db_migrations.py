@@ -191,6 +191,8 @@ def run_migrations(engine: Engine):
     migrate_enhanced_media_and_submissions(engine)
     ensure_user_tenant_ids(engine)
     migrate_user_demographics(engine)
+    migrate_questions_and_tests(engine)
+    migrate_users_extra_fields(engine)
 
 
 def migrate_user_demographics(engine: Engine):
@@ -205,3 +207,106 @@ def migrate_user_demographics(engine: Engine):
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN gender VARCHAR(50)"))
     except Exception as e:
         logging.error(f"Error migrating user demographics: {e}")
+
+
+def migrate_users_extra_fields(engine: Engine):
+    """Add phone_number and user_code columns to users; add test_id to submissions and test_assignments."""
+    try:
+        if _column_missing(engine, 'users', 'phone_number'):
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN phone_number VARCHAR(30)"))
+        if _column_missing(engine, 'users', 'user_code'):
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN user_code VARCHAR(50)"))
+                # Best-effort uniqueness via index in SQLite
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_users_user_code ON users(user_code)"))
+        if _column_missing(engine, 'submissions', 'test_id'):
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE submissions ADD COLUMN test_id VARCHAR(36)"))
+        if _column_missing(engine, 'test_assignments', 'test_id'):
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE test_assignments ADD COLUMN test_id VARCHAR(36)"))
+    except Exception as e:
+        logging.error(f"Error migrating users extra fields: {e}")
+
+
+def migrate_questions_and_tests(engine: Engine):
+    """Create questions/tests related tables if missing."""
+    try:
+        if _table_missing(engine, 'questions'):
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE questions (
+                        id VARCHAR(36) PRIMARY KEY,
+                        question_code VARCHAR(50) UNIQUE NOT NULL,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT NOT NULL,
+                        question_type VARCHAR(10) NOT NULL CHECK (question_type IN ('SJT','JDT','CASE')),
+                        competencies JSON NOT NULL,
+                        content JSON NOT NULL,
+                        scope VARCHAR(50) DEFAULT 'system' CHECK (scope IN ('system','tenant')),
+                        tenant_id VARCHAR(36),
+                        created_by VARCHAR(36),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+        if _table_missing(engine, 'tests'):
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE tests (
+                        id VARCHAR(36) PRIMARY KEY,
+                        test_code VARCHAR(50) UNIQUE NOT NULL,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT NOT NULL,
+                        test_type VARCHAR(10) NOT NULL CHECK (test_type IN ('SJT','JDT','CASE')),
+                        scope VARCHAR(50) DEFAULT 'system' CHECK (scope IN ('system','tenant')),
+                        tenant_id VARCHAR(36),
+                        created_by VARCHAR(36),
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+        if _table_missing(engine, 'test_questions'):
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE test_questions (
+                        id VARCHAR(36) PRIMARY KEY,
+                        test_id VARCHAR(36) NOT NULL,
+                        question_id VARCHAR(36) NOT NULL,
+                        sort_order INTEGER DEFAULT 0,
+                        settings JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+        if _table_missing(engine, 'test_competency_overrides'):
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE test_competency_overrides (
+                        id VARCHAR(36) PRIMARY KEY,
+                        test_id VARCHAR(36) NOT NULL,
+                        competency_code VARCHAR(100) NOT NULL,
+                        competency_name VARCHAR(255) NOT NULL,
+                        override_description TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE (test_id, competency_code)
+                    )
+                """))
+        if _table_missing(engine, 'status_events'):
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE status_events (
+                        id VARCHAR(36) PRIMARY KEY,
+                        event_type VARCHAR(100) NOT NULL,
+                        message TEXT NOT NULL,
+                        tenant_id VARCHAR(36),
+                        actor_user_id VARCHAR(36),
+                        payload JSON,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+    except Exception as e:
+        logging.error(f"Error migrating questions/tests tables: {e}")

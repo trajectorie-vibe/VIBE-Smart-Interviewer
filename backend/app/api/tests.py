@@ -15,6 +15,7 @@ from app.models import (
     User, Configuration, TestAssignment, TestAttempt,
     TestAvailabilityResponse, StartAttemptRequest, StartAttemptResponse, TestAttemptResponse
 )
+from app.models import StatusEvent
 
 router = APIRouter(prefix="/tests", tags=["tests"])
 
@@ -276,6 +277,19 @@ async def start_test_attempt(
     db.commit()
     db.refresh(attempt)
 
+    # Status event: test started
+    try:
+        db.add(StatusEvent(
+            event_type="test_started",
+            message=f"User {current_user.email} started test {tt}",
+            tenant_id=current_user.tenant_id,
+            actor_user_id=current_user.id,
+            payload={"attempt_id": str(attempt.id), "test_type": tt}
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     attempt_response = TestAttemptResponse.from_orm(attempt)
 
     remaining_allowed = availability.max_attempts - attempt_number
@@ -526,4 +540,16 @@ async def complete_attempt(
         attempt.attempt_metadata = meta
     db.commit()
     db.refresh(attempt)
+    # Status event: test completed
+    try:
+        db.add(StatusEvent(
+            event_type="test_completed",
+            message=f"User {current_user.email} completed test {attempt.test_type}",
+            tenant_id=current_user.tenant_id,
+            actor_user_id=current_user.id,
+            payload={"attempt_id": str(attempt.id), "test_type": attempt.test_type}
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
     return CompleteAttemptResponse(attempt=TestAttemptResponse.from_orm(attempt), message="Attempt completed")

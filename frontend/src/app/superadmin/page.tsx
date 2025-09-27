@@ -27,6 +27,9 @@ import CompetencyManagement from '@/components/superadmin/CompetencyManagement';
 import BulkUserGenerator from '@/components/superadmin/BulkUserGenerator';
 import SJTScenarioManagement from '@/components/superadmin/SJTScenarioManagement';
 import BulkAdminAssignment from '@/components/superadmin/BulkAdminAssignment';
+import TestAssignments from '@/components/superadmin/TestAssignments';
+import TestConfigWizard from '@/components/superadmin/TestConfigWizard';
+import QuestionBankManagement from '@/components/superadmin/QuestionBankManagement';
 
 // Define navigation items for the sidebar
 const navigationItems = [
@@ -35,6 +38,18 @@ const navigationItems = [
     label: 'Overview',
     icon: Home,
     description: 'Platform overview and key metrics'
+  },
+  {
+    id: 'test-wizard',
+    label: 'Test Config Wizard',
+    icon: Database,
+    description: 'Create structured tests, add questions and overrides'
+  },
+  {
+    id: 'question-bank',
+    label: 'Question Bank',
+    icon: Database,
+    description: 'Manage questions: list, filter, create, import/export'
   },
   {
     id: 'companies',
@@ -67,6 +82,12 @@ const navigationItems = [
     description: 'Per-company SJT scenario selection and assignment'
   },
   {
+    id: 'assign-tests',
+    label: 'Assign Tests',
+    icon: Target,
+    description: 'Assign structured tests to candidates and import/export CSV'
+  },
+  {
     id: 'assign-users-admin',
     label: 'Assign Users to Admin',
     icon: UserCheck,
@@ -87,6 +108,16 @@ function SuperAdminDashboard() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const activeSectionData = navigationItems.find(item => item.id === activeSection);
+
+  // Allow deep-linking via ?page=question-bank etc.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const page = params.get('page');
+    if (page && navigationItems.some(it => it.id === page)) {
+      setActiveSection(page);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -211,6 +242,9 @@ function SuperAdminDashboard() {
           {activeSection === 'bulk-generate' && <BulkGenerateSection />}
           {activeSection === 'competencies' && <CompetenciesSection />}
           {activeSection === 'sjt' && <SJTSection />}
+          {activeSection === 'assign-tests' && <AssignTestsSection />}
+          {activeSection === 'test-wizard' && <TestWizardSection />}
+          {activeSection === 'question-bank' && <QuestionBankSection />}
           {activeSection === 'assign-users-admin' && <BulkAdminAssignment />}
           {activeSection === 'settings' && <SettingsSection />}
         </main>
@@ -338,6 +372,18 @@ function CompetenciesSection() {
 
 function SJTSection() {
   return <SJTScenarioManagement />;
+}
+
+function AssignTestsSection() {
+  return <TestAssignments />;
+}
+
+function TestWizardSection() {
+  return <TestConfigWizard />;
+}
+
+function QuestionBankSection() {
+  return <QuestionBankManagement />;
 }
 
 function SettingsSection() {

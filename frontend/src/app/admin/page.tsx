@@ -26,7 +26,7 @@ interface GlobalSettings {
 }
 
 const AdminDashboard = () => {
-    const { logout } = useAuth();
+    const { logout, isSuperAdmin } = useAuth();
     const { toast } = useToast();
     const [settings, setSettings] = useState<GlobalSettings>({
         replyMode: 'video',
@@ -166,6 +166,8 @@ const AdminDashboard = () => {
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {/* Hide Global Settings card for admins; keep visible for superadmin when visiting admin area */}
+                {isSuperAdmin && (
                 <Card className="md:col-span-2 lg:col-span-3 bg-card/60 backdrop-blur-xl">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Settings /> Global Settings</CardTitle>
@@ -267,21 +269,27 @@ const AdminDashboard = () => {
                         <Button onClick={handleSaveSettings}>Save Global Settings</Button>
                     </CardFooter>
                 </Card>
+                )}
 
-                <Link href="/admin/sjt" className="block hover:no-underline">
-                    <AdminConfigCard
-                        icon={<FileText className="h-8 w-8 text-primary" />}
-                        title="Situational Judgement Test"
-                        description="Configure situations with best/worst answers and assign competencies."
-                    />
-                </Link>
-                <Link href="/admin/jd" className="block hover:no-underline">
-                    <AdminConfigCard
-                        icon={<Briefcase className="h-8 w-8 text-primary" />}
-                        title="Job Description Based"
-                        description="Paste a Job Description to generate relevant questions and assess skills."
-                    />
-                </Link>
+                {/* Hide config links for admins as per new governance. Keep code but don't render. */}
+                {isSuperAdmin && (
+                  <>
+                    <Link href="/admin/sjt" className="block hover:no-underline">
+                        <AdminConfigCard
+                            icon={<FileText className="h-8 w-8 text-primary" />}
+                            title="Situational Judgement Test"
+                            description="Configure situations with best/worst answers and assign competencies."
+                        />
+                    </Link>
+                    <Link href="/admin/jd" className="block hover:no-underline">
+                        <AdminConfigCard
+                            icon={<Briefcase className="h-8 w-8 text-primary" />}
+                            title="Job Description Based"
+                            description="Paste a Job Description to generate relevant questions and assess skills."
+                        />
+                    </Link>
+                  </>
+                )}
                  <Link href="/admin/submissions" className="block hover:no-underline">
                     <AdminConfigCard
                         icon={<FileSearch className="h-8 w-8 text-primary" />}
