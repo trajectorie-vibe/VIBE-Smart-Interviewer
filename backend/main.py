@@ -41,8 +41,8 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Trajectorie Assessment Platform API",
-    description="Multi-tenant assessment platform with SJT and JDT tests",
-    version="1.0.0",
+    description="Multi-tenant assessment platform with SJT, JDT, and CASE tests; structured tests and question bank",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )

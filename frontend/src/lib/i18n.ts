@@ -150,7 +150,45 @@ const resources = {
       'flashcard.instructions.r2': 'Don\'t shut the browser, and avoid power-outs if you can.',
       'flashcard.instructions.r3': 'Choose what you would really do, not what you should ideally do.',
       'flashcard.instructions.r4': 'Submit every answer and Click "Finish" test when you\'ve answered all!',
-      'flashcard.instructions.gotIt': 'Got it!'
+      'flashcard.instructions.gotIt': 'Got it!',
+
+      // Flashcard extra labels/buttons
+      'flashcard.situation': 'Situation',
+      'flashcard.questionLabel': 'Question',
+      'flashcard.followUpLabel': 'Follow-up Question',
+      'flashcard.cancelTest.title': 'Cancel Test?',
+      'flashcard.cancelTest.message1': 'If you cancel now, your current progress may be lost and you might not be able to retake the test depending on company policy.',
+      'flashcard.cancelTest.message2': 'Are you sure you want to exit?',
+      'flashcard.cancelTest.continue': 'Continue Test',
+      'flashcard.cancelTest.yesCancel': 'Yes, Cancel',
+      'flashcard.instructions.prepTime': 'Prep time enabled: You will have {{seconds}} seconds to prepare before recording starts automatically.',
+      'flashcard.instructions.ttsEnabled': 'Text-to-speech is enabled. Click the speaker in your browser bar if you need to allow audio.',
+
+      // GDPR Consent
+      'gdpr.title': 'Disclaimer – AI-Based Personality Assessment for HR Use (GDPR-Compliant)',
+      'gdpr.p1': 'This personality assessment has been generated using an AI system that processes speech content (including translated text), vocal features and other acoustic signals, and facial expressions. The analysis is powered by third-party technologies, including Google language libraries and Gemini, and is intended to provide supplementary behavioural insights in a corporate Human Resources context.',
+      'gdpr.p2': 'The results of this assessment are generated through automated processing and machine learning models. They are not intended to replace human judgment or serve as the sole basis for recruitment, promotion, or other employment-related decisions. The insights offered should be interpreted in conjunction with other assessment tools.',
+      'gdpr.dataTitle': 'Data Protection and GDPR Compliance',
+      'gdpr.p3': 'All personal data processed in the course of generating this assessment is handled in compliance with the General Data Protection Regulation (Regulation (EU) 2016/679). The processing is based on the lawful basis of explicit consent and is limited to the specific purpose of personality and communication style assessment for HR evaluation.',
+      'gdpr.p4': 'Data subjects have the right to access, rectify, or erase their personal data, restrict or object to processing, and to withdraw consent at any time without affecting the lawfulness of processing based on consent before its withdrawal. No personal data is shared with third parties without proper safeguards and agreements in place.',
+      'gdpr.p5': 'Trajectorie takes appropriate technical and organisational measures to ensure data security, integrity, and confidentiality. For any queries or to exercise your data protection rights, please contact our Data Protection Officer at solutions@trajectorie.com.',
+      'gdpr.consentTitle': 'Consent Declaration',
+      'gdpr.p6': 'I, the undersigned, hereby give my explicit and informed consent for Trajectorie to collect, process, and analyse my speech, voice, and facial data for the sole purpose of generating an AI-based personality assessment in connection with HR-related evaluations. I understand that the assessment results may be reviewed by authorised personnel for recruitment, team-building, or training purposes, and that they will not be used as the sole basis for any employment decision.',
+      'gdpr.p7': 'I acknowledge that I have read and understood the above disclaimer, including my rights under the GDPR. I understand that I may withdraw my consent at any time by contacting Trajectorie (solutions@trajectorie.com), and that doing so will not affect any prior lawful processing.',
+      'gdpr.checkbox': 'I have read the agreement and accept',
+      'gdpr.continue': 'Continue',
+
+      // Face check checklist
+      'facecheck.title': 'Before you start',
+      'facecheck.description': 'We need to check your camera and microphone to make sure everything will work smoothly.',
+      'facecheck.camera.title': 'Camera access',
+      'facecheck.camera.pass': 'Camera is working',
+      'facecheck.camera.fail': 'Camera not available or permission denied',
+      'facecheck.mic.title': 'Microphone access',
+      'facecheck.mic.pass': 'Microphone is working',
+      'facecheck.mic.fail': 'Microphone not available or permission denied',
+      'facecheck.retry': 'Retry checks',
+      'facecheck.start': 'I am ready to start'
     }
   },
   es: {
@@ -268,7 +306,45 @@ const resources = {
       'flashcard.instructions.r2': 'No cierres el navegador y evita cortes de energía si es posible.',
       'flashcard.instructions.r3': 'Elige lo que realmente harías, no lo que idealmente deberías hacer.',
       'flashcard.instructions.r4': 'Envía cada respuesta y haz clic en "Finalizar" cuando hayas respondido todo.',
-      'flashcard.instructions.gotIt': '¡Entendido!'
+      'flashcard.instructions.gotIt': '¡Entendido!',
+
+      // Flashcard extra
+      'flashcard.situation': 'Situación',
+      'flashcard.questionLabel': 'Pregunta',
+      'flashcard.followUpLabel': 'Pregunta de seguimiento',
+      'flashcard.cancelTest.title': '¿Cancelar la prueba?',
+      'flashcard.cancelTest.message1': 'Si cancelas ahora, podrías perder tu progreso actual y es posible que no puedas volver a realizar la prueba según la política de la empresa.',
+      'flashcard.cancelTest.message2': '¿Seguro que quieres salir?',
+      'flashcard.cancelTest.continue': 'Continuar la prueba',
+      'flashcard.cancelTest.yesCancel': 'Sí, cancelar',
+      'flashcard.instructions.prepTime': 'Tiempo de preparación habilitado: tendrás {{seconds}} segundos para prepararte antes de que comience la grabación automáticamente.',
+      'flashcard.instructions.ttsEnabled': 'La lectura por voz está habilitada. Haz clic en el altavoz en la barra del navegador si necesitas permitir audio.',
+
+      // GDPR
+      'gdpr.title': 'Descargo de responsabilidad – Evaluación de personalidad basada en IA para RR. HH. (Cumple con GDPR)',
+      'gdpr.p1': 'Esta evaluación de personalidad se ha generado utilizando un sistema de IA que procesa el contenido del habla (incluido el texto traducido), características vocales y otras señales acústicas, y expresiones faciales. El análisis utiliza tecnologías de terceros, incluidas bibliotecas de idiomas de Google y Gemini, y tiene como objetivo proporcionar conocimientos conductuales complementarios en un contexto de Recursos Humanos corporativo.',
+      'gdpr.p2': 'Los resultados de esta evaluación se generan mediante procesamiento automatizado y modelos de aprendizaje automático. No pretenden reemplazar el juicio humano ni servir como única base para decisiones de contratación, promoción u otras decisiones relacionadas con el empleo. Las ideas ofrecidas deben interpretarse junto con otras herramientas de evaluación.',
+      'gdpr.dataTitle': 'Protección de datos y cumplimiento de GDPR',
+      'gdpr.p3': 'Todos los datos personales procesados durante la generación de esta evaluación se manejan en cumplimiento con el Reglamento General de Protección de Datos (Reglamento (UE) 2016/679). El procesamiento se basa en el consentimiento explícito y se limita al propósito específico de evaluar la personalidad y el estilo de comunicación para la evaluación de RR. HH.',
+      'gdpr.p4': 'Los interesados tienen derecho a acceder, rectificar o borrar sus datos personales, restringir u oponerse al tratamiento, y a retirar el consentimiento en cualquier momento sin afectar la licitud del tratamiento basado en el consentimiento antes de su retirada. No se comparten datos personales con terceros sin las salvaguardias y acuerdos adecuados.',
+      'gdpr.p5': 'Trajectorie adopta medidas técnicas y organizativas apropiadas para garantizar la seguridad, integridad y confidencialidad de los datos. Para consultas o para ejercer sus derechos de protección de datos, contacte a nuestro Delegado de Protección de Datos en solutions@trajectorie.com.',
+      'gdpr.consentTitle': 'Declaración de consentimiento',
+      'gdpr.p6': 'Yo, el abajo firmante, doy mi consentimiento explícito e informado para que Trajectorie recopile, procese y analice mis datos de voz y rostro con el único propósito de generar una evaluación de personalidad basada en IA relacionada con evaluaciones de RR. HH.',
+      'gdpr.p7': 'Reconozco que he leído y comprendido el aviso anterior, incluidos mis derechos bajo el GDPR. Entiendo que puedo retirar mi consentimiento en cualquier momento contactando a Trajectorie (solutions@trajectorie.com), sin afectar el procesamiento legal previo.',
+      'gdpr.checkbox': 'He leído el acuerdo y lo acepto',
+      'gdpr.continue': 'Continuar',
+
+      // Face check
+      'facecheck.title': 'Antes de empezar',
+      'facecheck.description': 'Necesitamos comprobar tu cámara y micrófono para asegurarnos de que todo funcione correctamente.',
+      'facecheck.camera.title': 'Acceso a la cámara',
+      'facecheck.camera.pass': 'La cámara funciona',
+      'facecheck.camera.fail': 'Cámara no disponible o permiso denegado',
+      'facecheck.mic.title': 'Acceso al micrófono',
+      'facecheck.mic.pass': 'El micrófono funciona',
+      'facecheck.mic.fail': 'Micrófono no disponible o permiso denegado',
+      'facecheck.retry': 'Reintentar comprobaciones',
+      'facecheck.start': 'Estoy listo para empezar'
     }
   },
   ar: {
@@ -386,7 +462,45 @@ const resources = {
       'flashcard.instructions.r2': 'لا تُغلق المتصفح وتجنب انقطاع الطاقة إن أمكن.',
       'flashcard.instructions.r3': 'اختر ما ستفعله حقًا، وليس ما ينبغي فعله نظريًا.',
       'flashcard.instructions.r4': 'أرسل كل إجابة واضغط "إنهاء" عند إكمال الجميع!',
-      'flashcard.instructions.gotIt': 'فهمت'
+      'flashcard.instructions.gotIt': 'فهمت',
+
+      // Flashcard extra
+      'flashcard.situation': 'الموقف',
+      'flashcard.questionLabel': 'السؤال',
+      'flashcard.followUpLabel': 'سؤال متابعة',
+      'flashcard.cancelTest.title': 'إلغاء الاختبار؟',
+      'flashcard.cancelTest.message1': 'إذا ألغيت الآن، قد تفقد تقدمك الحالي وقد لا تتمكن من إعادة الاختبار وفقًا لسياسة الشركة.',
+      'flashcard.cancelTest.message2': 'هل أنت متأكد أنك تريد الخروج؟',
+      'flashcard.cancelTest.continue': 'متابعة الاختبار',
+      'flashcard.cancelTest.yesCancel': 'نعم، إلغاء',
+      'flashcard.instructions.prepTime': 'تم تفعيل وقت التحضير: سيكون لديك {{seconds}} ثانية للاستعداد قبل بدء التسجيل تلقائيًا.',
+      'flashcard.instructions.ttsEnabled': 'تم تمكين تحويل النص إلى كلام. انقر على رمز السماعة في شريط المتصفح إذا احتجت للسماح بالصوت.',
+
+      // GDPR
+      'gdpr.title': 'إخلاء مسؤولية – تقييم شخصية قائم على الذكاء الاصطناعي للاستخدام في الموارد البشرية (متوافق مع GDPR)',
+      'gdpr.p1': 'تم إنشاء هذا التقييم باستخدام نظام ذكاء اصطناعي يعالج محتوى الكلام (بما في ذلك النص المترجم)، والخصائص الصوتية وإشارات صوتية أخرى، وتعبيرات الوجه. يعتمد التحليل على تقنيات خارجية، بما في ذلك مكتبات لغات Google وGemini، ويهدف إلى تقديم رؤى سلوكية إضافية في سياق الموارد البشرية.',
+      'gdpr.p2': 'تُولد نتائج هذا التقييم من خلال معالجة آلية ونماذج تعلم آلي. لا تهدف إلى استبدال الحكم البشري أو أن تكون الأساس الوحيد لقرارات التوظيف أو الترقية أو غيرها من القرارات المتعلقة بالعمل. يجب تفسير النتائج مع أدوات تقييم أخرى.',
+      'gdpr.dataTitle': 'حماية البيانات والامتثال للائحة GDPR',
+      'gdpr.p3': 'تُعالج جميع البيانات الشخصية وفقًا للائحة العامة لحماية البيانات (اللائحة (الاتحاد الأوروبي) 2016/679). يعتمد المعالجة على أساس قانوني هو الموافقة الصريحة ومحصورة لغرض تقييم الشخصية وأسلوب التواصل لأغراض تقييم الموارد البشرية.',
+      'gdpr.p4': 'للأفراد حقوق في الوصول إلى بياناتهم الشخصية أو تصحيحها أو محوها، وتقييد المعالجة أو الاعتراض عليها، وسحب الموافقة في أي وقت دون التأثير على قانونية المعالجة السابقة.',
+      'gdpr.p5': 'تتخذ Trajectorie تدابير تقنية وتنظيمية مناسبة لضمان أمن البيانات وسلامتها وسريتها. للاستفسارات أو لممارسة حقوق حماية البيانات، يرجى التواصل مع مسؤول حماية البيانات لدينا على solutions@trajectorie.com.',
+      'gdpr.consentTitle': 'إقرار بالموافقة',
+      'gdpr.p6': 'أمنح موافقتي الصريحة والمستنيرة لـ Trajectorie على جمع بياناتي الصوتية والمرئية ومعالجتها وتحليلها لغرض وحيد هو إنشاء تقييم شخصية قائم على الذكاء الاصطناعي مرتبط بتقييمات الموارد البشرية.',
+      'gdpr.p7': 'أقر بأنني قرأت وفهمت الإخلاء أعلاه، بما في ذلك حقوقي بموجب GDPR. أفهم أنني قد أسحب موافقتي في أي وقت من خلال التواصل مع Trajectorie، دون التأثير على المعالجة القانونية السابقة.',
+      'gdpr.checkbox': 'لقد قرأت الاتفاقية وأوافق',
+      'gdpr.continue': 'متابعة',
+
+      // Face check
+      'facecheck.title': 'قبل البدء',
+      'facecheck.description': 'نحتاج إلى التحقق من الكاميرا والميكروفون للتأكد من أن كل شيء يعمل بسلاسة.',
+      'facecheck.camera.title': 'الوصول إلى الكاميرا',
+      'facecheck.camera.pass': 'الكاميرا تعمل',
+      'facecheck.camera.fail': 'الكاميرا غير متاحة أو تم رفض الإذن',
+      'facecheck.mic.title': 'الوصول إلى الميكروفون',
+      'facecheck.mic.pass': 'الميكروفون يعمل',
+      'facecheck.mic.fail': 'الميكروفون غير متاح أو تم رفض الإذن',
+      'facecheck.retry': 'إعادة المحاولة',
+      'facecheck.start': 'أنا جاهز للبدء'
     }
   }
   ,
@@ -501,7 +615,45 @@ const resources = {
       'flashcard.instructions.r2': 'ब्राउज़र बंद न करें और संभव हो तो पावर कट से बचें।',
       'flashcard.instructions.r3': 'जो आप वास्तव में करेंगे वही चुनें, जो आदर्श रूप से करना चाहिए वह नहीं।',
       'flashcard.instructions.r4': 'हर उत्तर जमा करें और सभी उत्तर देने के बाद "समाप्त करें" पर क्लिक करें!',
-      'flashcard.instructions.gotIt': 'समझ गया'
+      'flashcard.instructions.gotIt': 'समझ गया',
+
+      // Flashcard extra
+      'flashcard.situation': 'स्थिति',
+      'flashcard.questionLabel': 'प्रश्न',
+      'flashcard.followUpLabel': 'फॉलो-अप प्रश्न',
+      'flashcard.cancelTest.title': 'परीक्षा रद्द करें?',
+      'flashcard.cancelTest.message1': 'यदि आप अभी रद्द करते हैं, तो आपकी वर्तमान प्रगति खो सकती है और कंपनी की नीति के अनुसार आप पुनः परीक्षा नहीं दे पाएंगे।',
+      'flashcard.cancelTest.message2': 'क्या आप वाकई बाहर निकलना चाहते हैं?',
+      'flashcard.cancelTest.continue': 'परीक्षा जारी रखें',
+      'flashcard.cancelTest.yesCancel': 'हाँ, रद्द करें',
+      'flashcard.instructions.prepTime': 'तैयारी समय सक्षम: रिकॉर्डिंग शुरू होने से पहले आपके पास {{seconds}} सेकंड होंगे।',
+      'flashcard.instructions.ttsEnabled': 'टेक्स्ट-टू-स्पीच सक्षम है। यदि आवश्यक हो तो ब्राउज़र बार में स्पीकर आइकन पर क्लिक कर ऑडियो की अनुमति दें।',
+
+      // GDPR
+      'gdpr.title': 'अस्वीकरण – एचआर उपयोग के लिए एआई-आधारित व्यक्तित्व मूल्यांकन (GDPR-अनुपालन)',
+      'gdpr.p1': 'यह व्यक्तित्व मूल्यांकन एक एआई सिस्टम का उपयोग करके उत्पन्न किया गया है जो भाषण सामग्री (अनुवादित पाठ सहित), वोकल फीचर्स और अन्य ध्वनिक संकेतों और चेहरे के हावभाव को प्रोसेस करता है। विश्लेषण थर्ड-पार्टी तकनीकों (Google भाषा लाइब्रेरी और Gemini सहित) द्वारा संचालित है और कॉर्पोरेट एचआर संदर्भ में पूरक व्यवहार संबंधी अंतर्दृष्टि प्रदान करने के लिए है।',
+      'gdpr.p2': 'इस मूल्यांकन के परिणाम स्वचालित प्रोसेसिंग और मशीन लर्निंग मॉडलों के माध्यम से उत्पन्न होते हैं। इन्हें मानव निर्णय का स्थान लेने या किसी भी रोजगार-संबंधी निर्णय का एकमात्र आधार बनने के लिए नहीं बनाया गया है। प्रदान की गई अंतर्दृष्टि को अन्य मूल्यांकन उपकरणों के साथ मिलाकर समझा जाना चाहिए।',
+      'gdpr.dataTitle': 'डेटा सुरक्षा और GDPR अनुपालन',
+      'gdpr.p3': 'इस मूल्यांकन को उत्पन्न करने के दौरान प्रोसेस किए गए सभी व्यक्तिगत डेटा जनरल डेटा प्रोटेक्शन रेगुलेशन (Regulation (EU) 2016/679) के अनुपालन में संभाले जाते हैं। प्रोसेसिंग स्पष्ट सहमति के कानूनी आधार पर आधारित है और एचआर मूल्यांकन के लिए व्यक्तित्व और संचार शैली का आकलन करने के विशिष्ट उद्देश्य तक सीमित है।',
+      'gdpr.p4': 'डेटा विषयों को अपने व्यक्तिगत डेटा तक पहुंचने, उसे सुधारने या हटाने, प्रोसेसिंग को प्रतिबंधित करने या आपत्ति करने और किसी भी समय सहमति वापस लेने का अधिकार है।',
+      'gdpr.p5': 'Trajectorie डेटा सुरक्षा, अखंडता और गोपनीयता सुनिश्चित करने के लिए उपयुक्त तकनीकी और संगठनात्मक उपाय करती है। प्रश्नों के लिए या अपने डेटा संरक्षण अधिकारों का उपयोग करने के लिए हमारे DPO से solutions@trajectorie.com पर संपर्क करें।',
+      'gdpr.consentTitle': 'सहमति घोषणा',
+      'gdpr.p6': 'मैं, हस्ताक्षरी, Trajectorie को एचआर-संबंधित मूल्यांकन के लिए एआई-आधारित व्यक्तित्व मूल्यांकन उत्पन्न करने के उद्देश्य से मेरी आवाज़ और चेहरे के डेटा को एकत्र करने, प्रोसेस करने और विश्लेषण करने के लिए स्पष्ट और सूचित सहमति देता/देती हूँ।',
+      'gdpr.p7': 'मैंने ऊपर दिए गए अस्वीकरण और GDPR के तहत अपने अधिकारों को पढ़ा और समझा है। मैं समझता/समझती हूँ कि मैं किसी भी समय Trajectorie से संपर्क करके अपनी सहमति वापस ले सकता/सकती हूँ।',
+      'gdpr.checkbox': 'मैंने समझौता पढ़ लिया है और स्वीकार करता/करती हूँ',
+      'gdpr.continue': 'आगे बढ़ें',
+
+      // Face check
+      'facecheck.title': 'शुरू करने से पहले',
+      'facecheck.description': 'हमें यह सुनिश्चित करने के लिए आपके कैमरा और माइक्रोफ़ोन की जाँच करनी होगी कि सब कुछ ठीक से काम करेगा।',
+      'facecheck.camera.title': 'कैमरा एक्सेस',
+      'facecheck.camera.pass': 'कैमरा काम कर रहा है',
+      'facecheck.camera.fail': 'कैमरा उपलब्ध नहीं या अनुमति अस्वीकृत',
+      'facecheck.mic.title': 'माइक्रोफ़ोन एक्सेस',
+      'facecheck.mic.pass': 'माइक्रोफ़ोन काम कर रहा है',
+      'facecheck.mic.fail': 'माइक्रोफ़ोन उपलब्ध नहीं या अनुमति अस्वीकृत',
+      'facecheck.retry': 'जाँच पुनः चलाएँ',
+      'facecheck.start': 'मैं शुरू करने के लिए तैयार हूँ'
     }
   }
 };

@@ -2,9 +2,10 @@
 Competencies API endpoints for managing competency dictionaries
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import csv, io
 
 from app.database import get_db
 from sqlalchemy import func
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/competencies", tags=["competencies"])
 async def create_competency(
     data: CompetencyCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_superadmin)
 ):
     """Create a new competency (admin/superadmin)"""
 
@@ -105,7 +106,7 @@ async def update_competency(
     code: str,
     data: CompetencyUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_superadmin)
 ):
     norm = code.strip()
     with UserContext(db, current_user):
@@ -131,7 +132,7 @@ async def delete_competency(
     code: str,
     hard: bool = Query(False, description="If true, permanently delete. Otherwise soft-deactivate."),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_superadmin)
 ):
     norm = code.strip()
     with UserContext(db, current_user):
@@ -150,3 +151,80 @@ async def delete_competency(
             comp.is_active = False
             db.commit()
             return {"message": "Competency deactivated"}
+
+@router.get("/export")
+async def export_competencies_csv(
+    tenant_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    with UserContext(db, current_user):
+        q = db.query(CompetencyDictionary)
+        if current_user.role != 'superadmin':
+            q = q.filter(CompetencyDictionary.tenant_id == current_user.tenant_id)
+        elif tenant_id:
+            q = q.filter(CompetencyDictionary.tenant_id == tenant_id)
+        items = q.order_by(CompetencyDictionary.created_at.asc()).all()
+    headers = ["competency_code","competency_name","competency_description","meta_competency","category","industry","role_category","is_active","tenant_id"]
+    out = io.StringIO()
+    w = csv.DictWriter(out, fieldnames=headers)
+    w.writeheader()
+    for c in items:
+        w.writerow({
+            "competency_code": c.competency_code,
+            "competency_name": c.competency_name,
+            "competency_description": c.competency_description or "",
+            "meta_competency": c.meta_competency or "",
+            "category": c.category or "",
+            "industry": c.industry or "",
+            "role_category": c.role_category or "",
+            "is_active": int(bool(c.is_active)),
+            "tenant_id": c.tenant_id or "",
+        })
+    return {"csv": out.getvalue()}
+
+@router.post("/import")
+async def import_competencies_csv(
+    file: UploadFile = File(..., description="CSV file with headers: competency_code,competency_name,competency_description,meta_competency,category,industry,role_category"),
+    tenant_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_superadmin)
+):
+    import csv, io
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+    reader = csv.DictReader(io.StringIO(text))
+    required = ["competency_code","competency_name","competency_description"]
+    created, skipped = 0, []
+    with UserContext(db, current_user):
+        for row in reader:
+            if not any((v or "").strip() for v in row.values()):
+                continue
+            missing = [f for f in required if not (row.get(f) or "").strip()]
+            if missing:
+                skipped.append({"row": row, "reason": f"missing fields: {', '.join(missing)}"})
+                continue
+            code = row["competency_code"].strip()
+            existing = db.query(CompetencyDictionary).filter(
+                CompetencyDictionary.tenant_id == (tenant_id or current_user.tenant_id),
+                func.lower(CompetencyDictionary.competency_code) == func.lower(code)
+            ).first()
+            if existing:
+                skipped.append({"row": row, "reason": "duplicate code"})
+                continue
+            comp = CompetencyDictionary(
+                tenant_id=(tenant_id or current_user.tenant_id),
+                competency_code=code,
+                competency_name=row["competency_name"].strip(),
+                competency_description=row["competency_description"].strip(),
+                meta_competency=(row.get("meta_competency") or "").strip() or None,
+                translations=None,
+                category=(row.get("category") or "").strip() or None,
+                industry=(row.get("industry") or "").strip() or None,
+                role_category=(row.get("role_category") or "").strip() or None,
+                is_active=True
+            )
+            db.add(comp)
+            created += 1
+        db.commit()
+    return {"created": created, "skipped": skipped}

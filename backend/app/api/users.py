@@ -2,7 +2,7 @@
 Users API endpoints
 Provides CRUD operations for users, including updating company (tenant) and role fields.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 import uuid
@@ -11,6 +11,7 @@ from app.database import get_db
 from app.auth import get_current_active_user, require_admin, require_superadmin
 from app.models import User, Tenant, UserUpdate, UserResponse, UserCreate
 from app.auth import get_password_hash
+from app.utils.ids import get_next_code
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -80,7 +81,7 @@ async def update_user(
     # Update other allowed fields
     for field in (
         'email', 'candidate_name', 'candidate_id', 'client_name', 'role',
-        'preferred_language', 'language_code', 'is_active', 'age', 'gender'
+        'preferred_language', 'language_code', 'is_active', 'age', 'gender', 'phone_number'
     ):
         if field in update_data and update_data[field] is not None:
             setattr(user, field, update_data[field])
@@ -116,10 +117,17 @@ async def create_user(
         role=payload.role,
         preferred_language=payload.preferred_language,
         language_code=payload.language_code,
+        phone_number=payload.phone_number,
         age=payload.age,
         gender=payload.gender,
         tenant_id=tenant_id
     )
+    # Assign a human-friendly user code like C1, C2 ...
+    try:
+        user.user_code = get_next_code(db, 'users', 'user_code', 'C')
+    except Exception:
+        # Non-fatal if code generation fails
+        pass
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -166,3 +174,114 @@ async def get_user_by_email(
     if current_user.role != 'superadmin' and user.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Forbidden")
     return user
+
+
+# ==============================
+# CSV IMPORT (Admin/Superadmin)
+# ==============================
+
+@router.post("/import-csv")
+async def import_users_csv(
+    file: UploadFile = File(..., description="CSV with headers: email,password,candidate_name,candidate_id,client_name,role; ignore empty rows; all required"),
+    tenant_id: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Bulk import users from CSV.
+
+    Rules:
+    - Ignore completely empty rows.
+    - All required fields must be non-empty: email,password,candidate_name,candidate_id,client_name,role
+    - Roles allowed: candidate (always). Admin creation allowed only for superadmin; admins are coerced to candidate.
+    - Duplicates by email are skipped. Duplicate candidate_id+client_name are skipped.
+    - Tenant assignment:
+      * Admin: forced to their tenant; query tenant_id ignored.
+      * Superadmin: must provide tenant_id (query param), otherwise 400.
+    """
+    import csv, io
+
+    # Determine target tenant
+    target_tenant_id: str | None
+    if current_user.role == 'superadmin':
+        if not tenant_id:
+            raise HTTPException(status_code=400, detail="tenant_id is required for superadmin CSV import")
+        # Validate tenant exists
+        t = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+        if not t:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        target_tenant_id = str(tenant_id)
+    else:
+        target_tenant_id = str(current_user.tenant_id) if current_user.tenant_id else None
+        if not target_tenant_id:
+            raise HTTPException(status_code=400, detail="Current admin has no tenant configured")
+
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+    reader = csv.DictReader(io.StringIO(text))
+    required = ["email", "password", "candidate_name", "candidate_id", "client_name", "role"]
+
+    created: list[UserResponse] = []
+    skipped: list[dict] = []
+
+    for row in reader:
+        # Skip completely empty rows
+        if not any((v or "").strip() for v in row.values()):
+            continue
+
+        # Validate required fields
+        missing = [f for f in required if not (row.get(f) or "").strip()]
+        if missing:
+            skipped.append({"row": row, "reason": f"missing: {', '.join(missing)}"})
+            continue
+
+        email = row["email"].strip()
+        password = row["password"].strip()
+        candidate_name = row["candidate_name"].strip()
+        candidate_id = row["candidate_id"].strip()
+        client_name = row["client_name"].strip()
+        role = row["role"].strip().lower()
+
+        # Enforce role policy
+        if current_user.role != 'superadmin':
+            role = 'candidate'
+        else:
+            if role not in ('candidate', 'admin'):
+                skipped.append({"row": row, "reason": "invalid role (allowed: candidate, admin)"})
+                continue
+
+        # Duplicates
+        if db.query(User).filter(User.email == email).first():
+            skipped.append({"row": row, "reason": "duplicate email"})
+            continue
+        from sqlalchemy import and_
+        exists_cid = db.query(User).filter(and_(User.candidate_id == candidate_id, User.client_name == client_name)).first()
+        if exists_cid:
+            skipped.append({"row": row, "reason": "duplicate candidate_id for client"})
+            continue
+
+        # Create user
+        u = User(
+            email=email,
+            password_hash=get_password_hash(password),
+            candidate_name=candidate_name,
+            candidate_id=candidate_id,
+            client_name=client_name,
+            role=role,
+            preferred_language='en',
+            language_code='en',
+            tenant_id=target_tenant_id,
+        )
+        try:
+            u.user_code = get_next_code(db, 'users', 'user_code', 'C')
+        except Exception:
+            pass
+        db.add(u)
+        try:
+            db.commit()
+            db.refresh(u)
+            created.append(UserResponse.from_orm(u))
+        except Exception as e:
+            db.rollback()
+            skipped.append({"row": row, "reason": f"db error: {getattr(e, 'detail', str(e))}"})
+
+    return {"created": len(created), "skipped": skipped}

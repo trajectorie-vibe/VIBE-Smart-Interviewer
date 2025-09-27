@@ -32,7 +32,8 @@ class MediaStorageConfig:
     """Configuration for media storage"""
     
     def __init__(self):
-        self.storage_provider = os.getenv("STORAGE_PROVIDER", "firebase")  # Default to Firebase
+        # Default to local storage for now; can be switched to firebase/s3 via env later
+        self.storage_provider = os.getenv("STORAGE_PROVIDER", "local")
         self.local_storage_path = os.getenv("STORAGE_PATH", "./uploads")
         self.max_file_size = int(os.getenv("MAX_FILE_SIZE", "10485760"))  # 10MB default
         

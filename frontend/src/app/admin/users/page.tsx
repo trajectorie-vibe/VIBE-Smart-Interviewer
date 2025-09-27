@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, UserPlus, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
+import { Users, UserPlus, Trash2, ArrowLeft, Loader2, Upload, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import Header from '@/components/header';
@@ -137,6 +137,37 @@ const UserManagementPage = () => {
         }
     };
     
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [importing, setImporting] = useState(false);
+    const onImportClick = () => fileInputRef.current?.click();
+    const onImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImporting(true);
+        try {
+            const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+            const token = (typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null) || localStorage.getItem('access_token');
+            const form = new FormData();
+            form.append('file', file);
+            const url = new URL(baseURL + '/api/v1/users/import-csv');
+            // Superadmin can pick tenant by query (later we can add a dropdown); admins ignored
+            // url.searchParams.set('tenant_id', '...');
+            const res = await fetch(url.toString(), { method: 'POST', headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }, body: form });
+            if (!res.ok) {
+                const err = await res.json().catch(()=>({}));
+                throw new Error(err.detail || `Failed (${res.status})`);
+            }
+            const data = await res.json();
+            toast({ title: 'Import finished', description: `Created ${data.created}, skipped ${data.skipped?.length || 0}` });
+            await fetchUsers();
+        } catch (e:any) {
+            toast({ variant:'destructive', title: 'Import failed', description: e.message || 'Unknown error' });
+        } finally {
+            setImporting(false);
+            e.target.value = '';
+        }
+    };
+    
     return (
         <>
             <Header />
@@ -157,6 +188,8 @@ const UserManagementPage = () => {
                     </Link>
                 </header>
                 <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Only superadmin can add individual users; admins are limited to CSV import and viewing */}
+                    {isSuperAdmin && (
                     <div className="lg:col-span-1">
                         <Card className="bg-card/60 backdrop-blur-xl">
                             <CardHeader>
@@ -235,6 +268,7 @@ const UserManagementPage = () => {
                             </form>
                         </Card>
                     </div>
+                    )}
 
                     <div className="lg:col-span-2">
                          <Card className="bg-card/60 backdrop-blur-xl">
@@ -243,6 +277,21 @@ const UserManagementPage = () => {
                                 <CardDescription>A list of all users currently in the system.</CardDescription>
                             </CardHeader>
                             <CardContent>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="text-sm text-muted-foreground">CSV: headers must include email,password,candidate_name,candidate_id,client_name,role. Empty rows ignored.</div>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="secondary" onClick={onImportClick} disabled={importing}><Upload className="h-4 w-4 mr-1"/> Import CSV</Button>
+                                        <input ref={fileInputRef} onChange={onImportFile} type="file" accept=".csv,text/csv" className="hidden" />
+                                        <Button variant="outline" onClick={()=> {
+                                            const sample = 'email,password,candidate_name,candidate_id,client_name,role\nuser1@example.com,Secret123,Jane Doe,CAND-1,Acme,candidate';
+                                            const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a'); a.href = url; a.download = 'users_sample.csv'; a.click(); URL.revokeObjectURL(url);
+                                        }}>
+                                            <Download className="h-4 w-4 mr-1"/> Sample CSV
+                                        </Button>
+                                    </div>
+                                </div>
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -273,35 +322,32 @@ const UserManagementPage = () => {
                                                                                                                  u.role}
                                                       </span>
                                                     </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {/* Superadmin can delete anyone except themselves, regular admin can delete non-admin users */}
-                                                        {(
-                                                                                                                    (isSuperAdmin && u.email !== 'superadmin@gmail.com') ||
-                                                                                                                    (isAdmin && !isSuperAdmin && u.role !== 'admin' && u.role !== 'superadmin' && u.email !== 'admin@gmail.com')
-                                                        ) && (
-                                                            <AlertDialog>
-                                                              <AlertDialogTrigger asChild>
-                                                                 <Button variant="ghost" size="icon">
-                                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                                </Button>
-                                                              </AlertDialogTrigger>
-                                                              <AlertDialogContent>
-                                                                <AlertDialogHeader>
-                                                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                  <AlertDialogDescription>
-                                                                                                                                        This action cannot be undone. This will permanently delete the user account for {u.candidate_name}.
-                                                                  </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                                                                                    <AlertDialogAction onClick={() => handleDeleteUser(u.id)} className="bg-destructive hover:bg-destructive/90">
-                                                                    Delete User
-                                                                  </AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                              </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        )}
-                                                    </TableCell>
+                                                                                                        <TableCell className="text-right">
+                                                                                                                {/* Only superadmin can delete users from this view */}
+                                                                                                                {isSuperAdmin && u.email !== 'superadmin@gmail.com' && (
+                                                                                                                    <AlertDialog>
+                                                                                                                        <AlertDialogTrigger asChild>
+                                                                                                                            <Button variant="ghost" size="icon">
+                                                                                                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                                                                                                            </Button>
+                                                                                                                        </AlertDialogTrigger>
+                                                                                                                        <AlertDialogContent>
+                                                                                                                            <AlertDialogHeader>
+                                                                                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                                                                                <AlertDialogDescription>
+                                                                                                                                    This action cannot be undone. This will permanently delete the user account for {u.candidate_name}.
+                                                                                                                                </AlertDialogDescription>
+                                                                                                                            </AlertDialogHeader>
+                                                                                                                            <AlertDialogFooter>
+                                                                                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                                                                                <AlertDialogAction onClick={() => handleDeleteUser(u.id)} className="bg-destructive hover:bg-destructive/90">
+                                                                                                                                    Delete User
+                                                                                                                                </AlertDialogAction>
+                                                                                                                            </AlertDialogFooter>
+                                                                                                                        </AlertDialogContent>
+                                                                                                                    </AlertDialog>
+                                                                                                                )}
+                                                                                                        </TableCell>
                                                 </TableRow>
                                             ))
                                         ) : (

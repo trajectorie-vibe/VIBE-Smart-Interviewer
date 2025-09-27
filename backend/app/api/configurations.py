@@ -45,18 +45,18 @@ async def create_configuration(
         ).first()
     
     if existing_config:
-        # Deactivate existing configuration
+        # Deactivate existing configuration but do not bump its version
         existing_config.is_active = False
-        existing_config.version += 1
     
     # Create new configuration (convert UUIDs to strings for SQLite compatibility)
+    next_version = 1 if not existing_config else existing_config.version + 1
     new_config = Configuration(
         tenant_id=str(tenant_id) if tenant_id else None,
         config_type=config_data.config_type,
         scope=config_data.scope,
         config_data=config_data.config_data,
         created_by=str(current_user.id),
-        version=1 if not existing_config else existing_config.version + 1
+        version=next_version
     )
     
     with UserContext(db, current_user):
@@ -349,3 +349,27 @@ async def get_global_settings(
     """Get global settings"""
     
     return await get_configuration_by_type("global", None, db, current_user)
+
+# Public (unauthenticated) read-only endpoint for system-wide global settings.
+# This allows the login page and other public surfaces to fetch non-sensitive
+# configuration without requiring a JWT. Only returns scope=="system" configs.
+@router.get("/public/global", response_model=Optional[ConfigurationResponse])
+async def get_public_global_settings(
+    db: Session = Depends(get_db),
+):
+    """Get system-wide global settings without authentication (read-only)."""
+    try:
+        configuration = (
+            db.query(Configuration)
+            .filter(
+                Configuration.scope == "system",
+                Configuration.config_type == "global",
+                Configuration.is_active == True,
+            )
+            .order_by(Configuration.created_at.desc())
+            .first()
+        )
+        return configuration
+    except Exception:
+        # Fail closed (as None) on any DB error to avoid exposing internals
+        return None

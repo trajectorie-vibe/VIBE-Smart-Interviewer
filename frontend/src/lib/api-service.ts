@@ -121,9 +121,14 @@ class FastAPIService {
     const hasBody = typeof (options as any).body !== 'undefined' && (options as any).body !== null;
     const baseHeaders: Record<string, string> = (options.headers as Record<string,string> || {});
     const headers: Record<string, string> = { ...baseHeaders };
-    // Only set Content-Type for requests with a body (POST/PUT/PATCH/DELETE). For GET/HEAD, omit to avoid CORS preflight.
+    // Only set Content-Type for JSON payloads. If body is FormData/Blob, let the browser set it.
     if (hasBody && !headers['Content-Type']) {
-      headers['Content-Type'] = 'application/json';
+      const body: any = (options as any).body;
+      const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+      const isBlob = typeof Blob !== 'undefined' && body instanceof Blob;
+      if (!isFormData && !isBlob) {
+        headers['Content-Type'] = 'application/json';
+      }
     }
 
     // Add authorization header if token exists
@@ -460,6 +465,11 @@ class FastAPIService {
     return this.request<any>(`/api/v1/configurations/type/${type}`);
   }
 
+  // Public (unauthenticated) global settings fetch
+  async getPublicGlobalSettings(): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/configurations/public/global`);
+  }
+
   async getConfigurationForTenant(type: string, tenantId: string): Promise<ApiResponse<any>> {
     // Superadmin can fetch config for a specific tenant by passing tenant_id
     const qs = new URLSearchParams({ tenant_id: tenantId }).toString();
@@ -483,7 +493,7 @@ class FastAPIService {
   }
 
   // Assignments
-  async getTestAssignments(params?: { user_id?: string; test_type?: string }): Promise<ApiResponse<any[]>> {
+  async getTestAssignments(params?: { user_id?: string; test_type?: string; status?: string }): Promise<ApiResponse<any[]>> {
     const query = params ? '?' + new URLSearchParams(
       Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
     ).toString() : '';
@@ -492,7 +502,8 @@ class FastAPIService {
 
   async bulkAssignTests(payload: {
     user_ids: string[];
-    test_types: string[];
+    test_types?: string[];
+    test_id?: string;
     due_date?: string;
     max_attempts?: number;
     notes?: string;
@@ -502,6 +513,80 @@ class FastAPIService {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  }
+
+  async updateTestAssignment(assignmentId: string, updates: any): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/assignments/tests/${assignmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteTestAssignment(assignmentId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/api/v1/assignments/tests/${assignmentId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async importTestAssignmentsCSV(file: File, options?: { test_id?: string; test_type?: string; tenant_id?: string }): Promise<ApiResponse<any[]>> {
+    const form = new FormData();
+    form.append('file', file);
+    const params = new URLSearchParams();
+    if (options?.test_id) params.set('test_id', options.test_id);
+    if (!options?.test_id && options?.test_type) params.set('test_type', options.test_type);
+    if (options?.tenant_id) params.set('tenant_id', options.tenant_id);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.request<any[]>(`/api/v1/assignments/tests/import-csv${qs}`, {
+      method: 'POST',
+      body: form,
+      // Intentionally omit Content-Type so browser sets multipart boundary
+    } as any);
+  }
+
+  async exportTestAssignmentsCSV(params?: { user_id?: string; test_type?: string; status?: string }): Promise<ApiResponse<{ csv: string; count: number }>> {
+    const query = params ? '?' + new URLSearchParams(
+      Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
+    ).toString() : '';
+    return this.request<{ csv: string; count: number }>(`/api/v1/assignments/tests/export${query}`);
+  }
+
+  // Structured Tests (superadmin-focused)
+  async listStructuredTests(params?: { search?: string; test_type?: string }): Promise<ApiResponse<any[]>> {
+    const query = params ? '?' + new URLSearchParams(
+      Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
+    ).toString() : '';
+    return this.request<any[]>(`/api/v1/tests-structured${query}`);
+  }
+
+  async createStructuredTest(payload: { name: string; description: string; test_type: 'SJT'|'JDT'|'CASE'; scope?: 'system'|'tenant'; tenant_id?: string | null; config?: any }): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/tests-structured`, { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async addQuestionsToTest(test_id: string, question_ids: string[]): Promise<ApiResponse<any[]>> {
+    return this.request<any[]>(`/api/v1/tests-structured/${test_id}/questions`, { method: 'POST', body: JSON.stringify({ question_ids }) });
+  }
+
+  async setTestCompetencyOverrides(test_id: string, overrides: Array<{ competency_code: string; competency_name: string; override_description: string }>): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/tests-structured/${test_id}/competencies`, { method: 'PUT', body: JSON.stringify({ overrides }) });
+  }
+
+  async exportStructuredTestsCSV(params?: { test_type?: string }): Promise<ApiResponse<{ csv: string; count: number }>> {
+    const query = params ? '?' + new URLSearchParams(
+      Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
+    ).toString() : '';
+    return this.request<{ csv: string; count: number }>(`/api/v1/tests-structured/export${query}`);
+  }
+
+  async updateStructuredTest(test_id: string, updates: { name?: string; description?: string; is_active?: boolean; config?: any }): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/tests-structured/${test_id}`, { method: 'PUT', body: JSON.stringify(updates) });
+  }
+
+  async removeQuestionFromTest(test_id: string, question_id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/api/v1/tests-structured/${test_id}/questions/${question_id}`, { method: 'DELETE' });
+  }
+
+  async reorderTestQuestions(test_id: string, question_ids: string[]): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/api/v1/tests-structured/${test_id}/questions/reorder`, { method: 'PUT', body: JSON.stringify({ question_ids }) });
   }
 
   // Platform health
@@ -535,6 +620,47 @@ class FastAPIService {
   // Check if authenticated
   isAuthenticated(): boolean {
     return !!this.accessToken;
+  }
+
+  // Question Bank
+  async listQuestions(params?: { qtype?: 'SJT'|'JDT'|'CASE'; search?: string; competencies?: string[] }): Promise<ApiResponse<any[]>> {
+    let qs = '';
+    if (params) {
+      const sp = new URLSearchParams();
+      for (const [k, v] of Object.entries(params)) {
+        if (v === undefined || v === null) continue;
+        if (Array.isArray(v)) { v.forEach(val => sp.append(k, String(val))); }
+        else sp.set(k, String(v));
+      }
+      const s = sp.toString();
+      qs = s ? `?${s}` : '';
+    }
+    return this.request<any[]>(`/api/v1/question-bank${qs}`);
+  }
+
+  async createQuestion(payload: { name: string; description: string; question_type: 'SJT'|'JDT'|'CASE'; competencies: string[]; content: any; scope?: 'system'|'tenant'; tenant_id?: string | null }): Promise<ApiResponse<any>> {
+    const body = { ...payload, scope: payload.scope || 'system' };
+    return this.request<any>(`/api/v1/question-bank`, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async updateQuestion(question_id: string, payload: Partial<{ name: string; description: string; question_type: 'SJT'|'JDT'|'CASE'; competencies: string[]; content: any }>): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/question-bank/${question_id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  }
+
+  async deleteQuestion(question_id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/api/v1/question-bank/${question_id}`, { method: 'DELETE' });
+  }
+
+  async importQuestionsCSV(file: File, options?: { scope?: 'system'|'tenant'; tenant_id?: string }): Promise<ApiResponse<{ created: number; skipped: any[] }>> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('scope', options?.scope || 'system');
+    if (options?.tenant_id) form.append('tenant_id', options.tenant_id);
+    return this.request<{ created: number; skipped: any[] }>(`/api/v1/question-bank/import`, { method: 'POST', body: form } as any);
+  }
+
+  async exportQuestionsCSV(): Promise<ApiResponse<{ csv: string }>> {
+    return this.request<{ csv: string }>(`/api/v1/question-bank/export`);
   }
 }
 

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ProtectedRoute, useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 import type { ConversationEntry, AnalysisResult, PreInterviewDetails, InterviewMode, Submission } from '@/types';
@@ -53,15 +53,13 @@ function VerbalInterviewPage() {
   const [canTakeTest, setCanTakeTest] = useState(true);
   const [checkingAttempts, setCheckingAttempts] = useState(true);
   const [gdprAccepted, setGdprAccepted] = useState<boolean>(false);
-  const [requireGdprConsent, setRequireGdprConsent] = useState<boolean>(true);
-  // Dynamic attempts (replaces fixed MAX_ATTEMPTS)
-  const [maxAttempts, setMaxAttempts] = useState<number>(1);
-  const [attemptsUsed, setAttemptsUsed] = useState<number>(0);
   
   // 🔒 MINIMAL IMPACT RECOVERY STATE - Only used if feature enabled
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryData, setRecoveryData] = useState<SessionRecovery | null>(null);
   
+  const MAX_ATTEMPTS = 1;
+
   // Check if user can take the test
   useEffect(() => {
     // Read GDPR consent flag once on mount
@@ -72,48 +70,15 @@ function VerbalInterviewPage() {
       setGdprAccepted(false);
     }
 
-    // Load dynamic attempt limits from assignments and previous submissions
-    (async () => {
-      if (!user) return;
-      try {
-        const { apiService } = await import('@/lib/api-service');
-        // Fetch JDT assignments for the user
-        const assignments = await apiService.getTestAssignments({ user_id: (user as any).id, test_type: 'JDT' });
-        if (assignments.data && assignments.data.length) {
-          const relevant = assignments.data.filter((a: any) => a.test_type === 'JDT');
-          if (relevant.length) {
-            const maxFromAssignments = relevant.reduce((m: number, a: any) => typeof a.max_attempts === 'number' ? Math.max(m, a.max_attempts) : m, 1);
-            setMaxAttempts(maxFromAssignments || 1);
-          }
-        }
-        // Count prior submissions (attempts already used)
-        const subs = await apiService.getSubmissions({ user_id: (user as any).id, test_type: 'JDT' });
-        if (subs.data) {
-          setAttemptsUsed(Array.isArray(subs.data) ? subs.data.length : 0);
-        }
-      } catch (e) {
-        console.warn('Could not load dynamic attempt data for JDT; defaulting to 1', e);
-        setMaxAttempts(1);
-      }
-    })();
-
     const checkAttempts = async () => {
       try {
-        // Load JDT config to determine GDPR requirement
-        try {
-          const jdtConfig = await configurationService.getJDTConfig();
-          const require = jdtConfig?.settings?.requireGdprConsent;
-          setRequireGdprConsent(require !== undefined ? !!require : true);
-        } catch {
-          setRequireGdprConsent(true);
-        }
-        const canTake = await canUserTakeTest('JDT', maxAttempts);
+        const canTake = await canUserTakeTest('JDT', MAX_ATTEMPTS);
         setCanTakeTest(canTake);
         if (!canTake) {
           toast({
             variant: 'destructive',
             title: 'Maximum Attempts Reached',
-            description: `You have already completed the maximum number of attempts (${maxAttempts}) for this test.`,
+            description: `You have already completed the maximum number of attempts (${MAX_ATTEMPTS}) for this test.`,
           });
         }
       } catch (error) {
@@ -125,7 +90,7 @@ function VerbalInterviewPage() {
     };
 
     checkAttempts();
-  }, [canUserTakeTest, toast, user, maxAttempts]);
+  }, [canUserTakeTest, toast]);
 
   const handleGdprAccept = () => {
     try {
@@ -499,24 +464,10 @@ function VerbalInterviewPage() {
   const currentEntry = conversationHistory[currentQuestionIndex];
   const answeredQuestionsCount = conversationHistory.filter(entry => entry.answer !== null).length;
 
-  // Derive competency coverage for simple progress display (parity with SJT style)
-  const competencyProgress = useMemo(() => {
-    const totals = new Map<string, { total: number; answered: number }>();
-    for (const q of conversationHistory) {
-      const key = (q.competency || 'General').trim();
-      if (!totals.has(key)) totals.set(key, { total: 0, answered: 0 });
-      const v = totals.get(key)!;
-      v.total += 1;
-      if (q.answer && q.answer !== null && String(q.answer).trim() !== '') v.answered += 1;
-    }
-    // Stable order by competency name
-    return Array.from(totals.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [conversationHistory]);
-
 
   const renderContent = () => {
-    // Gate the flow with GDPR consent screen if required by admin configuration
-    if (requireGdprConsent && !gdprAccepted) {
+    // Gate the flow with GDPR consent screen before language selection
+    if (!gdprAccepted) {
       return (
         <div className="w-full max-w-5xl">
           <GDPRConsent onAccept={handleGdprAccept} />
@@ -539,25 +490,6 @@ function VerbalInterviewPage() {
         }
         return (
           <div className="w-full max-w-6xl flex flex-col items-center">
-            {/* Competency coverage bar */}
-            {competencyProgress.length > 0 && (
-              <div className="w-full mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                {competencyProgress.map(([name, v]) => {
-                  const pct = v.total > 0 ? Math.round((v.answered / v.total) * 100) : 0;
-                  return (
-                    <div key={name} className="rounded-md border p-3 bg-card/60">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium">{name}</span>
-                        <span className="text-muted-foreground">{v.answered}/{v.total}</span>
-                      </div>
-                      <div className="h-2 w-full bg-muted rounded">
-                        <div className="h-2 bg-primary rounded" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
             <Flashcard
               key={currentQuestionIndex}
               question={currentEntry.question}
@@ -655,7 +587,7 @@ function VerbalInterviewPage() {
                     </div>
                     <h2 className="text-2xl font-headline text-red-600 mb-2">Access Restricted</h2>
                     <p className="text-muted-foreground mb-6">
-                      You have reached the maximum number of attempts ({maxAttempts}) for this test. 
+                      You have reached the maximum number of attempts ({MAX_ATTEMPTS}) for this test. 
                       Please contact your administrator if you need additional attempts.
                     </p>
                     <Button onClick={() => router.push('/')} variant="outline">

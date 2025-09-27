@@ -86,8 +86,8 @@ const Flashcard: React.FC<FlashcardProps> = ({
   
   // Get timer value from props or use default for testing (answer timer, excludes reading time)
   const testTimerValue = questionTimeLimitInMinutes || 2;
-  // Dedicated reading time before answering begins (seconds) - configurable from admin settings
-  const [readingTimeRemaining, setReadingTimeRemaining] = useState<number>(prepTimeSeconds || 60);
+  // Dedicated reading time before answering begins (seconds)
+  const [readingTimeRemaining, setReadingTimeRemaining] = useState<number>(60);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaData, setMediaData] = useState<{ blob: Blob; dataUri: string } | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -182,8 +182,8 @@ const Flashcard: React.FC<FlashcardProps> = ({
         clearInterval(prepCountdownRef.current);
       }
 
-      // Initialize reading time countdown (configurable) and TTS during the reading phase
-      setReadingTimeRemaining(prepTimeSeconds || 60);
+      // Initialize reading time countdown (e.g., 60s) and TTS during the reading phase
+      setReadingTimeRemaining(60);
       const readingTimer = setInterval(() => {
         setReadingTimeRemaining(prev => {
           if (prev <= 1) {
@@ -593,7 +593,7 @@ const Flashcard: React.FC<FlashcardProps> = ({
                 <div className="flex items-center gap-6">
                     {testTimerValue && testTimerValue > 0 && (
                         <div className={`flex flex-col gap-1 ml-4`}>
-                            {/* Continuous progress bar: reading time (0 to readingDuration) + answering time (readingDuration to total) */}
+                            {/* Single continuous bar: left segment purple for reading, right for answering (orange->green) */}
                             <div className="flex items-center gap-3">
                               <div className="flex items-center gap-2 text-sm font-semibold">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7">
@@ -602,66 +602,24 @@ const Flashcard: React.FC<FlashcardProps> = ({
                                     <path d="M20 14a8 8 0 1 1-8-8 8 8 0 0 1 8 8Z"/>
                                     <path d="M7 15h5v5"/>
                                 </svg>
-                                {/* Show current phase and remaining time */}
+                                {/* Show remaining time: during reading show reading time, otherwise show answer time */}
                                 {readingTimeRemaining > 0
                                   ? `Reading | ${formatTime(readingTimeRemaining)}`
-                                  : `Answering | ${formatTime(questionTimeRemaining || (testTimerValue*60))}`
+                                  : `Time Remaining | ${formatTime(questionTimeRemaining || (testTimerValue*60))}`
                                 }
                               </div>
                             </div>
-                            <div className="w-80 h-3 bg-gray-300 rounded-full overflow-hidden relative">
-                              {(() => {
-                                const readingDuration = prepTimeSeconds || 60; // Use configurable reading time
-                                const answeringDuration = answerTimeSeconds || (testTimerValue * 60); // Use configurable answer time or fallback
-                                const totalDuration = readingDuration + answeringDuration;
-                                
-                                // Calculate current position on the continuous timeline
-                                let currentPosition = 0;
-                                if (readingTimeRemaining > 0) {
-                                  // During reading phase: progress from 0 to readingDuration
-                                  currentPosition = readingDuration - readingTimeRemaining;
-                                } else {
-                                  // During answering phase: progress from readingDuration to totalDuration
-                                  const answerTimeElapsed = answeringDuration - (questionTimeRemaining || answeringDuration);
-                                  currentPosition = readingDuration + answerTimeElapsed;
-                                }
-                                
-                                const progressPercentage = (currentPosition / totalDuration) * 100;
-                                const readingPercentage = (readingDuration / totalDuration) * 100;
-                                
-                                return (
-                                  <>
-                                    {/* Background segments to show reading vs answering sections */}
-                                    <div className="absolute inset-0 flex">
-                                      <div 
-                                        className="h-full bg-purple-200" 
-                                        style={{ width: `${readingPercentage}%` }}
-                                      />
-                                      <div 
-                                        className="h-full bg-orange-200" 
-                                        style={{ width: `${100 - readingPercentage}%` }}
-                                      />
-                                    </div>
-                                    
-                                    {/* Progress fill */}
-                                    <div
-                                      className="h-full transition-all duration-1000 relative z-10"
-                                      style={{
-                                        width: `${Math.min(100, Math.max(0, progressPercentage))}%`,
-                                        background: currentPosition <= readingDuration
-                                          ? 'linear-gradient(to right, #8B5CF6, #A855F7)' // Purple gradient for reading
-                                          : 'linear-gradient(to right, #8B5CF6, #A855F7, #F97316, #22C55E)' // Purple to orange to green for full progress
-                                      }}
-                                    />
-                                    
-                                    {/* Visual separator between reading and answering */}
-                                    <div 
-                                      className="absolute top-0 h-full w-0.5 bg-gray-600 z-20"
-                                      style={{ left: `${readingPercentage}%` }}
-                                    />
-                                  </>
-                                );
-                              })()}
+                            <div className="w-80 h-3 bg-gray-300 rounded-full overflow-hidden">
+                              {/* Bar composed of two overlays using background gradients */}
+                              <div
+                                className="h-full transition-all duration-1000"
+                                style={{
+                                  background: readingTimeRemaining > 0
+                                    ? `linear-gradient(to right, rgba(128,0,128,0.9) ${Math.min(100, (readingTimeRemaining/60)*100)}%, rgba(255,165,0,0.9) ${Math.min(100, (readingTimeRemaining/60)*100)}%)`
+                                    : `linear-gradient(to right, rgba(34,197,94,0.9) ${Math.max(0, (questionTimeRemaining/(testTimerValue*60))*100)}%, rgba(229,231,235,1) ${Math.max(0, (questionTimeRemaining/(testTimerValue*60))*100)}%)`,
+                                  width: '100%'
+                                }}
+                              />
                             </div>
                         </div>
                     )}
@@ -670,8 +628,8 @@ const Flashcard: React.FC<FlashcardProps> = ({
                   <Button variant="outline" className="bg-orange-400 hover:bg-orange-500 text-white rounded-full border-orange-500 px-4 py-1 h-auto" onClick={() => setShowInstructions(true)}>
                       {t('flashcard.instructions.button')} <Info className="ml-2 h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setShowCancelConfirm(true)}>
-                      <X className="mr-1 h-4 w-4" /> Cancel Test
+          <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setShowCancelConfirm(true)}>
+            <X className="mr-1 h-4 w-4" /> {t('flashcard.cancelTest.title')}
                   </Button>
                 </div>
            </div>
@@ -683,21 +641,21 @@ const Flashcard: React.FC<FlashcardProps> = ({
                 if (part.startsWith('Situation:')) {
                   return (
                     <div key={index} className="mb-4 p-3 rounded-md border border-gray-200 bg-gray-50">
-                      <p className="font-semibold mb-1">Situation</p>
+                      <p className="font-semibold mb-1">{t('flashcard.situation')}</p>
                       <p className="text-gray-800">{part.split(':').slice(1).join(':').trim()}</p>
                     </div>
                   );
                 } else if (part.startsWith('Question:')) {
                   return (
                     <div key={index} className="mb-2 p-3 rounded-md border border-blue-200 bg-blue-50">
-                      <p className="font-semibold text-blue-800 mb-1">Question</p>
+                      <p className="font-semibold text-blue-800 mb-1">{t('flashcard.questionLabel')}</p>
                       <p className="font-medium">{part.split(':').slice(1).join(':').trim()}</p>
                     </div>
                   );
                 } else if (part.startsWith('Follow-up Question:')) {
                   return (
                     <div key={index} className="mb-2 p-3 rounded-md border border-indigo-200 bg-indigo-50">
-                      <p className="font-semibold text-indigo-800 mb-1">Follow-up Question</p>
+                      <p className="font-semibold text-indigo-800 mb-1">{t('flashcard.followUpLabel')}</p>
                       <p className="font-medium">{part.split(':').slice(1).join(':').trim()}</p>
                     </div>
                   );
@@ -837,52 +795,48 @@ const Flashcard: React.FC<FlashcardProps> = ({
           <div className="space-y-4 py-4">
             {prepTimeSeconds > 0 && autoStartRecording && (
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                <p className="text-sm text-purple-800">
-                  Prep time enabled: You will have {prepTimeSeconds} seconds to prepare before recording starts automatically.
-                </p>
+                <p className="text-sm text-purple-800">{t('flashcard.instructions.prepTime', { seconds: prepTimeSeconds })}</p>
               </div>
             )}
             {ttsEnabled && (
               <div className="bg-sky-50 border border-sky-200 rounded-lg p-3">
-                <p className="text-sm text-sky-800">
-                  Text-to-speech is enabled. Click the speaker in your browser bar if you need to allow audio.
-                </p>
+                <p className="text-sm text-sky-800">{t('flashcard.instructions.ttsEnabled')}</p>
               </div>
             )}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-800 mb-2">Test Guidelines:</h3>
+              <h3 className="font-semibold text-blue-800 mb-2">{t('flashcard.instructions.guidelinesTitle')}</h3>
               <ul className="space-y-2 text-sm text-blue-700">
-                <li>• Answer all questions in one attempt, so start when you are really ready.</li>
-                <li>• "Submit" every response and "Finish Test" when you have responded to all.</li>
-                <li>• If no option matches your real life response to a question, choose one that is closest.</li>
-                <li>• Keep it real life, stay spontaneous. Do not overthink a response.</li>
+                <li>• {t('flashcard.instructions.g1')}</li>
+                <li>• {t('flashcard.instructions.g2')}</li>
+                <li>• {t('flashcard.instructions.g3')}</li>
+                <li>• {t('flashcard.instructions.g4')}</li>
               </ul>
             </div>
             
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="font-semibold text-green-800 mb-2">Navigation:</h3>
+              <h3 className="font-semibold text-green-800 mb-2">{t('flashcard.instructions.navigationTitle')}</h3>
               <ul className="space-y-2 text-sm text-green-700">
-                <li>• Use the numbered buttons to navigate between questions</li>
-                <li>• Green numbers indicate answered questions</li>
+                <li>• {t('flashcard.instructions.n1')}</li>
+                <li>• {t('flashcard.instructions.n2')}</li>
                 <li>• You can review and change your answers before finishing</li>
-                <li>• {timeLimitInMinutes > 0 ? `This test has a ${timeLimitInMinutes} minute time limit (you'll be automatically finished when time runs out)` : 'This test has no time limit'}</li>
-                <li>• The timer shows how long you've been taking the test</li>
+                <li>• {timeLimitInMinutes > 0 ? t('flashcard.instructions.n3_withLimit', { minutes: timeLimitInMinutes }) : t('flashcard.instructions.n3_noLimit')}</li>
+                <li>• {t('flashcard.instructions.n4')}</li>
               </ul>
             </div>
             
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <h3 className="font-semibold text-amber-800 mb-2">Important Reminders:</h3>
+              <h3 className="font-semibold text-amber-800 mb-2">{t('flashcard.instructions.remindersTitle')}</h3>
               <ul className="space-y-2 text-sm text-amber-700">
-                <li>• Try not to refresh the page, you will lose the answers you've worked hard to complete.</li>
-                <li>• Don't shut the browser, and avoid power-outs if you can.</li>
-                <li>• Choose what you would really do, not what you should ideally do.</li>
-                <li>• Submit every answer and Click "Finish" test when you've answered all!</li>
+                <li>• {t('flashcard.instructions.r1')}</li>
+                <li>• {t('flashcard.instructions.r2')}</li>
+                <li>• {t('flashcard.instructions.r3')}</li>
+                <li>• {t('flashcard.instructions.r4')}</li>
               </ul>
             </div>
           </div>
           <div className="flex justify-end">
             <Button onClick={() => setShowInstructions(false)} className="bg-primary hover:bg-primary/90">
-              Got it!
+              {t('flashcard.instructions.gotIt')}
             </Button>
           </div>
         </DialogContent>
@@ -893,15 +847,15 @@ const Flashcard: React.FC<FlashcardProps> = ({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-red-600 flex items-center gap-2">
-              <X className="h-5 w-5" /> Cancel Test?
+              <X className="h-5 w-5" /> {t('flashcard.cancelTest.title')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-gray-700">If you cancel now, your current progress may be lost and you might not be able to retake the test depending on company policy.</p>
-            <p className="text-sm text-gray-700">Are you sure you want to exit?</p>
+            <p className="text-sm text-gray-700">{t('flashcard.cancelTest.message1')}</p>
+            <p className="text-sm text-gray-700">{t('flashcard.cancelTest.message2')}</p>
           </div>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>Continue Test</Button>
+            <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>{t('flashcard.cancelTest.continue')}</Button>
             <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {
               if (testTimerRef.current) { clearInterval(testTimerRef.current); }
               if (onCancelInterview) {
@@ -910,7 +864,7 @@ const Flashcard: React.FC<FlashcardProps> = ({
                 onFinishInterview();
               }
                setShowCancelConfirm(false);
-            }}>Yes, Cancel</Button>
+            }}>{t('flashcard.cancelTest.yesCancel')}</Button>
           </div>
         </DialogContent>
       </Dialog>

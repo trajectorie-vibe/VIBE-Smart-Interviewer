@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +35,7 @@ interface TestAssignment {
 }
 
 export default function TestAssignmentManagement() {
+  const { isAdmin, isSuperAdmin } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [assignments, setAssignments] = useState<TestAssignment[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
@@ -92,6 +94,10 @@ export default function TestAssignmentManagement() {
   };
 
   const handleDeleteAssignment = async (assignmentId: string) => {
+    if (isAdmin && !isSuperAdmin) {
+      toast({ variant: 'destructive', title: 'Not allowed', description: 'Admins have view-only access.' });
+      return;
+    }
     try {
       const token = (typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null) || localStorage.getItem('access_token');
       const res = await fetch(`${API_BASE}/api/v1/assignments/tests/${assignmentId}`, {
@@ -131,6 +137,10 @@ export default function TestAssignmentManagement() {
   };
 
   const handleAssignTests = async () => {
+    if (isAdmin && !isSuperAdmin) {
+      toast({ variant: 'destructive', title: 'Not allowed', description: 'Admins have view-only access.' });
+      return;
+    }
     if (selectedUsers.size === 0 || selectedTests.size === 0) {
       toast({
         variant: 'destructive',
@@ -262,6 +272,7 @@ export default function TestAssignmentManagement() {
                         id={`user-${user.id}`}
                         checked={selectedUsers.has(user.id)}
                         onCheckedChange={(checked) => handleUserSelection(user.id, checked as boolean)}
+                        disabled={isAdmin && !isSuperAdmin}
                       />
                       <label htmlFor={`user-${user.id}`} className="flex-1 cursor-pointer">
                         <div className="font-medium">{user.candidate_name}</div>
@@ -285,6 +296,7 @@ export default function TestAssignmentManagement() {
                       id={`test-${testType}`}
                       checked={selectedTests.has(testType)}
                       onCheckedChange={(checked) => handleTestSelection(testType, checked as boolean)}
+                      disabled={isAdmin && !isSuperAdmin}
                     />
                     <label htmlFor={`test-${testType}`} className="cursor-pointer font-medium">
                       {testType}
@@ -308,6 +320,7 @@ export default function TestAssignmentManagement() {
                               if (c) next.add(s.id); else next.delete(s.id);
                               setSelectedScenarioIds(next);
                             }}
+                            disabled={isAdmin && !isSuperAdmin}
                           />
                           <span className="truncate">{s.name ? `${s.name}` : `#${String(s.id)}`} • {s.question}</span>
                         </label>
@@ -326,6 +339,7 @@ export default function TestAssignmentManagement() {
                 type="datetime-local"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                disabled={isAdmin && !isSuperAdmin}
               />
             </div>
 
@@ -339,6 +353,7 @@ export default function TestAssignmentManagement() {
                 max="10"
                 value={maxAttempts}
                 onChange={(e) => setMaxAttempts(parseInt(e.target.value) || 3)}
+                disabled={isAdmin && !isSuperAdmin}
               />
             </div>
 
@@ -351,13 +366,14 @@ export default function TestAssignmentManagement() {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add any notes about this test assignment..."
                 rows={3}
+                disabled={isAdmin && !isSuperAdmin}
               />
             </div>
 
             {/* Assign Button */}
             <Button
               onClick={handleAssignTests}
-              disabled={loading || selectedUsers.size === 0 || selectedTests.size === 0}
+              disabled={loading || selectedUsers.size === 0 || selectedTests.size === 0 || (isAdmin && !isSuperAdmin)}
               className="w-full"
             >
               {loading ? (
@@ -365,7 +381,7 @@ export default function TestAssignmentManagement() {
               ) : (
                 <>
                   <Target className="h-4 w-4 mr-2" />
-                  Assign {selectedTests.size} Test{selectedTests.size !== 1 ? 's' : ''} to {selectedUsers.size} User{selectedUsers.size !== 1 ? 's' : ''}
+                  {isAdmin && !isSuperAdmin ? 'View Only' : `Assign ${selectedTests.size} Test${selectedTests.size !== 1 ? 's' : ''} to ${selectedUsers.size} User${selectedUsers.size !== 1 ? 's' : ''}`}
                 </>
               )}
             </Button>
@@ -398,6 +414,7 @@ export default function TestAssignmentManagement() {
                               title="Delete assignment"
                               className="text-red-600 hover:text-red-700"
                               onClick={() => handleDeleteAssignment(assignment.id)}
+                              disabled={isAdmin && !isSuperAdmin}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>

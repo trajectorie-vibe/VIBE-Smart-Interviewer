@@ -25,6 +25,7 @@ import { ProgressiveUploadIndicator } from '@/components/progressive-upload-indi
 import { featureFlags } from '@/lib/feature-flags';
 import type { SessionRecovery, ProgressInfo, SaveResult } from '@/types/partial-submission';
 import { useLanguage } from '@/contexts/language-context';
+import FaceCheckChecklist from '../../components/interview/face-check-checklist';
 import CameraCheck from '@/components/camera-check';
 
 
@@ -86,44 +87,19 @@ function SJTInterviewPage() {
   const [reRecordLimit, setReRecordLimit] = useState(0);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [ttsVoice, setTtsVoice] = useState<string | undefined>(undefined);
+  const [readingTimeEnabled, setReadingTimeEnabled] = useState(true);
+  const [readingTimeSeconds, setReadingTimeSeconds] = useState(60);
   const [questionTimes, setQuestionTimes] = useState<number[]>([]); // Track time per question
   const [canTakeTest, setCanTakeTest] = useState(true);
   const [checkingAttempts, setCheckingAttempts] = useState(true);
   const [followUpMap, setFollowUpMap] = useState<{[key: number]: number}>({}); // Track follow-up count per question
   const [maxFollowUps, setMaxFollowUps] = useState(1); // Use configured follow-up count (default 1)
   const [gdprAccepted, setGdprAccepted] = useState<boolean>(false);
-  const [cameraReady, setCameraReady] = useState<boolean>(false);
-  const [cameraCheckEnabled, setCameraCheckEnabled] = useState<boolean>(false);
-  // Dynamic attempts (replaces fixed MAX_ATTEMPTS)
-  const [maxAttempts, setMaxAttempts] = useState<number>(1);
-  const [attemptsUsed, setAttemptsUsed] = useState<number>(0);
-
-  // Derive max attempts & attempts used from assignments + submissions
-  useEffect(() => {
-    (async () => {
-      if (!user) return;
-      try {
-        const { apiService } = await import('@/lib/api-service');
-        // Fetch SJT assignments for the user
-        const assignments = await apiService.getTestAssignments({ user_id: user.id, test_type: 'SJT' });
-        if (assignments.data && assignments.data.length) {
-          const relevant = assignments.data.filter(a => a.test_type === 'SJT');
-          if (relevant.length) {
-            const maxFromAssignments = relevant.reduce((m: number, a: any) => typeof a.max_attempts === 'number' ? Math.max(m, a.max_attempts) : m, 1);
-            setMaxAttempts(maxFromAssignments || 1);
-          }
-        }
-        // Count submissions (attempts already used)
-        const subs = await apiService.getSubmissions({ user_id: user.id, test_type: 'SJT' });
-        if (subs.data) {
-          setAttemptsUsed(Array.isArray(subs.data) ? subs.data.length : 0);
-        }
-      } catch (e) {
-        console.warn('⚠️ Could not load dynamic attempt data, defaulting to 1', e);
-        setMaxAttempts(1);
-      }
-    })();
-  }, [user]);
+  const [faceCheckComplete, setFaceCheckComplete] = useState(false);
+  // Two-step face check: 1) permissions, 2) live camera readiness
+  const [faceCheckStage, setFaceCheckStage] = useState<'PERMS' | 'CAM' | 'DONE'>('PERMS');
+  
+  const MAX_ATTEMPTS = 1;
 
   // Check if user can take the test
   useEffect(() => {
@@ -138,13 +114,13 @@ function SJTInterviewPage() {
 
     const checkAttempts = async () => {
       try {
-        const canTake = await canUserTakeTest('SJT', maxAttempts);
+        const canTake = await canUserTakeTest('SJT', MAX_ATTEMPTS);
         setCanTakeTest(canTake);
         if (!canTake) {
           toast({
             variant: 'destructive',
             title: 'Maximum Attempts Reached',
-            description: `You have already completed the maximum number of attempts (${maxAttempts}) for this test.`,
+            description: `You have already completed the maximum number of attempts (${MAX_ATTEMPTS}) for this test.`,
           });
         }
       } catch (error) {
@@ -156,7 +132,7 @@ function SJTInterviewPage() {
     };
 
     checkAttempts();
-  }, [canUserTakeTest, toast, maxAttempts]);
+  }, [canUserTakeTest, toast]);
 
   const handleGdprAccept = () => {
     try {
@@ -166,20 +142,6 @@ function SJTInterviewPage() {
     } catch {}
     setGdprAccepted(true);
   };
-
-  // Load global/SJT settings to decide if camera check is required
-  useEffect(() => {
-    (async () => {
-      try {
-        const sjt = await configurationService.getSJTConfig();
-        const global = await configurationService.getGlobalSettings();
-        const enabled = Boolean(sjt?.settings?.cameraCheckEnabled ?? global?.cameraCheckEnabled ?? false);
-        setCameraCheckEnabled(enabled);
-      } catch (e) {
-        setCameraCheckEnabled(false);
-      }
-    })();
-  }, []);
 
   const startInterview = useCallback(async (details: PreInterviewDetails) => {
     setStatus('INTERVIEW');
@@ -284,6 +246,8 @@ function SJTInterviewPage() {
           }
           // Load advanced SJT settings if present
           try {
+            if (typeof settings.readingTimeEnabled === 'boolean') setReadingTimeEnabled(settings.readingTimeEnabled);
+            if (typeof settings.readingTimeSeconds === 'number') setReadingTimeSeconds(settings.readingTimeSeconds);
             if (typeof settings.prepTimeSeconds === 'number') setPrepTimeSeconds(settings.prepTimeSeconds);
             if (typeof settings.autoStartRecording === 'boolean') setAutoStartRecording(settings.autoStartRecording);
             if (typeof settings.answerTimeSeconds === 'number') setAnswerTimeSeconds(settings.answerTimeSeconds);
@@ -976,11 +940,20 @@ function SJTInterviewPage() {
       );
     }
 
-    // Optional camera readiness gate
-    if (cameraCheckEnabled && !cameraReady) {
+    if (!faceCheckComplete) {
       return (
-        <div className="w-full max-w-5xl">
-          <CameraCheck onPassed={() => setCameraReady(true)} />
+        <div className="w-full max-w-5xl space-y-6">
+          {faceCheckStage === 'PERMS' && (
+            <FaceCheckChecklist onComplete={() => setFaceCheckStage('CAM')} />
+          )}
+          {faceCheckStage === 'CAM' && (
+            <CameraCheck
+              onPassed={() => {
+                setFaceCheckComplete(true);
+                setFaceCheckStage('DONE');
+              }}
+            />
+          )}
         </div>
       );
     }
@@ -1030,7 +1003,7 @@ function SJTInterviewPage() {
                   Situational Judgement Test
                 </h1>
                 <p className="text-center text-gray-600 mt-2">
-                  Questions: {`${sjtScenarios.length.toString().padStart(2, '0')}${maxFollowUps > 0 ? '+' : ''}`} • Attempts: {attemptsUsed}/{maxAttempts}
+                  Questions: {`${sjtScenarios.length.toString().padStart(2, '0')}${maxFollowUps > 0 ? '+' : ''}`}
                 </p>
               </div>
               
@@ -1052,6 +1025,7 @@ function SJTInterviewPage() {
                 answeredQuestionsCount={answeredQuestionsCount}
                 timeLimitInMinutes={timeLimit}
                 questionTimeLimitInMinutes={questionTimeLimit}
+                
                 onTimeUp={handleFinishInterview}
                 currentQuestionIndex={currentQuestionIndex}
                 setCurrentQuestionIndex={setCurrentQuestionIndex}
@@ -1077,7 +1051,7 @@ function SJTInterviewPage() {
                 Situational Judgement Test
               </h1>
               <p className="text-center text-gray-600 mt-2">
-                Questions: {`${sjtScenarios.length.toString().padStart(2, '0')}${maxFollowUps > 0 ? '+' : ''}`} • Attempts: {attemptsUsed}/{maxAttempts}
+                Questions: {`${sjtScenarios.length.toString().padStart(2, '0')}${maxFollowUps > 0 ? '+' : ''}`}
               </p>
             </div>
             {(() => {
@@ -1116,6 +1090,7 @@ function SJTInterviewPage() {
               reRecordLimit={effReRecord}
               ttsEnabled={true}
               ttsVoice={effVoice}
+              
             />
               );
             })()}
@@ -1198,7 +1173,7 @@ function SJTInterviewPage() {
                     </div>
                     <h2 className="text-2xl font-headline text-red-600 mb-2">Access Restricted</h2>
                     <p className="text-muted-foreground mb-6">
-                      You have reached the maximum number of attempts ({maxAttempts}) for this test. 
+                      You have reached the maximum number of attempts ({MAX_ATTEMPTS}) for this test. 
                       Please contact your administrator if you need additional attempts.
                     </p>
                     <Button onClick={() => router.push('/')} variant="outline">

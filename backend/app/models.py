@@ -53,6 +53,8 @@ class User(Base, TimestampMixin):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    phone_number = Column(String(30))
+    user_code = Column(String(50), unique=True)  # e.g., C1, C2 ... human-friendly code
     candidate_name = Column(String(255), nullable=False)
     candidate_id = Column(String(100), nullable=False)
     client_name = Column(String(255), nullable=False)
@@ -93,6 +95,7 @@ class Submission(Base, TimestampMixin):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'))
     tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='CASCADE'))
+    test_id = Column(String(36), ForeignKey('tests.id', ondelete='SET NULL'))  # link to structured Test when available
     
     # Basic submission info
     candidate_name = Column(String(255), nullable=False)
@@ -129,6 +132,8 @@ class Submission(Base, TimestampMixin):
     user = relationship("User", back_populates="submissions")
     tenant = relationship("Tenant", back_populates="submissions")
     media_files = relationship("MediaFile", back_populates="submission", cascade="all, delete-orphan")
+    # Optional link to structured test
+    # relationship defined after Test model declaration
 
 class MediaFile(Base, TimestampMixin):
     """Video/Audio file management with enhanced organization"""
@@ -332,7 +337,8 @@ class TestAssignment(Base, TimestampMixin):
     tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='CASCADE'), nullable=False)
     
     # Test details
-    test_type = Column(String(10), nullable=False)  # 'SJT' or 'JDT'
+    test_type = Column(String(10), nullable=False)  # 'SJT' or 'JDT' (legacy)
+    test_id = Column(String(36), ForeignKey('tests.id', ondelete='SET NULL'))  # new structured Test reference
     due_date = Column(DateTime(timezone=True))
     max_attempts = Column(Integer, default=3)
     
@@ -358,6 +364,8 @@ class TestAssignment(Base, TimestampMixin):
     user = relationship("User", foreign_keys=[user_id], backref="test_assignments")
     admin = relationship("User", foreign_keys=[admin_id])
     tenant = relationship("Tenant")
+    # Optional link to structured Test
+    # relationship defined after Test model declaration
 
 class TestAttempt(Base, TimestampMixin):
     """Discrete attempt of a test (SJT/JDT) by a user"""
@@ -415,6 +423,91 @@ class AuditLog(Base):
     tenant = relationship("Tenant")
 
 # =====================================================
+# NEW ENTITIES: QUESTIONS, TESTS, STATUS EVENTS
+# =====================================================
+
+class Question(Base, TimestampMixin):
+    """Question bank entries managed by superadmin (or tenant-specific when needed)."""
+    __tablename__ = 'questions'
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    question_code = Column(String(50), unique=True, nullable=False)  # Q1, Q2, ...
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    question_type = Column(String(10), nullable=False)  # SJT, JDT, CASE
+    competencies = Column(JSON, nullable=False)  # list of competency codes
+    content = Column(JSON, nullable=False)  # shape depends on type
+    scope = Column(String(50), default='system')  # system or tenant
+    tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='SET NULL'))
+    created_by = Column(String(36), ForeignKey('users.id'))
+
+    __table_args__ = (
+        CheckConstraint("question_type IN ('SJT','JDT','CASE')", name='check_question_type'),
+        CheckConstraint("scope IN ('system','tenant')", name='check_question_scope'),
+    )
+
+class Test(Base, TimestampMixin):
+    """Structured test composed of questions with competency overrides."""
+    __tablename__ = 'tests'
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    test_code = Column(String(50), unique=True, nullable=False)  # T1, T2, ...
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    test_type = Column(String(10), nullable=False)  # SJT, JDT, CASE
+    scope = Column(String(50), default='system')
+    tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='SET NULL'))
+    created_by = Column(String(36), ForeignKey('users.id'))
+    is_active = Column(Boolean, default=True)
+    # Optional per-test configuration (timers, reply mode, camera check, etc.)
+    config = Column(JSON)
+
+    __table_args__ = (
+        CheckConstraint("test_type IN ('SJT','JDT','CASE')", name='check_test_type_enum'),
+        CheckConstraint("scope IN ('system','tenant')", name='check_test_scope'),
+    )
+
+class TestQuestion(Base, TimestampMixin):
+    """Mapping of tests to questions with ordering and per-question settings."""
+    __tablename__ = 'test_questions'
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    test_id = Column(String(36), ForeignKey('tests.id', ondelete='CASCADE'), nullable=False)
+    question_id = Column(String(36), ForeignKey('questions.id', ondelete='CASCADE'), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    settings = Column(JSON)  # per-question overrides (timers, modality, etc.)
+
+class TestCompetencyOverride(Base, TimestampMixin):
+    """Per-test competency description overrides derived from selected questions."""
+    __tablename__ = 'test_competency_overrides'
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    test_id = Column(String(36), ForeignKey('tests.id', ondelete='CASCADE'), nullable=False)
+    competency_code = Column(String(100), nullable=False)
+    competency_name = Column(String(255), nullable=False)
+    override_description = Column(Text, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('test_id', 'competency_code', name='ux_test_comp_override'),
+    )
+
+class StatusEvent(Base):
+    """Event stream for status panel (admin sees tenant events; superadmin sees all)."""
+    __tablename__ = 'status_events'
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    event_type = Column(String(100), nullable=False)
+    message = Column(Text, nullable=False)
+    tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='SET NULL'))
+    actor_user_id = Column(String(36), ForeignKey('users.id', ondelete='SET NULL'))
+    payload = Column(JSON)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+# Backrefs after definitions
+Submission.test = relationship("Test", foreign_keys=[Submission.test_id])
+TestAssignment.test = relationship("Test", foreign_keys=[TestAssignment.test_id])
+
+# =====================================================
 # PYDANTIC MODELS FOR API SERIALIZATION
 # =====================================================
 
@@ -430,6 +523,7 @@ class UserBase(BaseModel):
     role: str = Field(..., pattern="^(superadmin|admin|candidate)$")
     preferred_language: str = "en"
     language_code: str = "en"
+    phone_number: Optional[str] = None
     age: Optional[int] = None
     gender: Optional[str] = None
 
@@ -457,6 +551,7 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: datetime
     tenant_id: Optional[uuid.UUID]
+    user_code: Optional[str]
     
     class Config:
         from_attributes = True
@@ -571,6 +666,7 @@ class UserAssignmentResponse(UserAssignmentBase):
 class TestAssignmentBase(BaseModel):
     user_id: uuid.UUID
     test_type: str = Field(..., pattern="^(JDT|SJT)$")
+    test_id: Optional[uuid.UUID] = None
     due_date: Optional[datetime] = None
     max_attempts: int = 3
     custom_config: Optional[Dict[str, Any]] = None
@@ -652,6 +748,7 @@ class BulkTestAssignmentRequest(BaseModel):
     user_ids: List[str]
     # Accept test_types case-insensitively and normalize server-side
     test_types: List[str] = Field(..., description="List of test types to assign (JDT, SJT)")
+    test_id: Optional[str] = Field(None, description="Structured Test ID to assign (preferred)")
     due_date: Optional[datetime] = None
     max_attempts: int = 3
     notes: Optional[str] = None
@@ -660,6 +757,87 @@ class BulkTestAssignmentRequest(BaseModel):
         None,
         description="For SJT assignments, restrict to these scenario IDs (from tenant SJT config)."
     )
+
+# Pydantic schemas for Questions and Tests
+class QuestionBase(BaseModel):
+    name: str
+    description: str
+    question_type: str = Field(..., pattern="^(SJT|JDT|CASE)$")
+    competencies: List[str]
+    content: Dict[str, Any]
+
+class QuestionCreate(QuestionBase):
+    add_to_bank: bool = True
+    scope: str = Field("system", pattern="^(system|tenant)$")
+    tenant_id: Optional[uuid.UUID] = None
+
+class QuestionResponse(QuestionBase):
+    id: uuid.UUID
+    question_code: str
+    scope: str
+    tenant_id: Optional[uuid.UUID]
+    created_at: datetime
+    updated_at: datetime
+    created_by: Optional[uuid.UUID]
+
+    class Config:
+        from_attributes = True
+
+class QuestionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    question_type: Optional[str] = Field(None, pattern="^(SJT|JDT|CASE)$")
+    competencies: Optional[List[str]] = None
+    content: Optional[Dict[str, Any]] = None
+
+class TestBase(BaseModel):
+    name: str
+    description: str
+    test_type: str = Field(..., pattern="^(SJT|JDT|CASE)$")
+    # Optional per-test configuration (timers, reply mode, camera check, etc.)
+    config: Optional[Dict[str, Any]] = None
+
+class TestCreate(TestBase):
+    scope: str = Field("system", pattern="^(system|tenant)$")
+    tenant_id: Optional[uuid.UUID] = None
+
+class TestResponse(TestBase):
+    id: uuid.UUID
+    test_code: str
+    scope: str
+    tenant_id: Optional[uuid.UUID]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    created_by: Optional[uuid.UUID]
+
+    class Config:
+        from_attributes = True
+
+class TestQuestionAddRequest(BaseModel):
+    question_ids: List[uuid.UUID]
+
+class TestQuestionResponse(BaseModel):
+    id: uuid.UUID
+    test_id: uuid.UUID
+    question_id: uuid.UUID
+    sort_order: int
+    settings: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+class CompetencyOverrideItem(BaseModel):
+    competency_code: str
+    competency_name: str
+    override_description: str
+
+class TestCompetencyOverridesRequest(BaseModel):
+    overrides: List[CompetencyOverrideItem]
+
+class TestCompetencyOverridesResponse(BaseModel):
+    test_id: uuid.UUID
+    overrides: List[CompetencyOverrideItem]
 
 # Competency Pydantic models
 class CompetencyBase(BaseModel):

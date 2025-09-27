@@ -147,15 +147,38 @@ export const configurationService = {
   async getGlobalSettings(): Promise<any | null> {
     try {
       console.log('📖 Fetching global settings from FastAPI');
+      // If not authenticated yet, prefer public endpoint first
+      if (!apiService.isAuthenticated()) {
+        const pub = await apiService.getPublicGlobalSettings();
+        if (pub.data) {
+          console.log('✅ Global settings fetched (public endpoint)');
+          return pub.data?.config_data || null;
+        }
+      }
+
+      // Authenticated path or fallback
       const result = await apiService.getConfiguration('global');
       if (!result.data) {
-        // Safe fallback if backend returns 404 Not Found
+        // Try public endpoint as fallback
+        const pub = await apiService.getPublicGlobalSettings();
+        if (pub.data) {
+          console.log('✅ Global settings fetched (public fallback)');
+          return pub.data?.config_data || null;
+        }
         console.warn('Global settings not found, using safe defaults');
         return null;
       }
       console.log('✅ Global settings fetched:', 'Found');
       return result.data?.config_data || null;
     } catch (error) {
+      console.warn('⚠️ Authenticated global settings fetch failed. Trying public endpoint...');
+      try {
+        const pub = await apiService.getPublicGlobalSettings();
+        if (pub.data) {
+          console.log('✅ Global settings fetched (public after error)');
+          return pub.data?.config_data || null;
+        }
+      } catch {}
       console.error('❌ Error getting global settings from FastAPI:', error);
       return null;
     }
