@@ -239,6 +239,37 @@ async def update_test_metadata(
         db.rollback()
     return t
 
+@router.get("/{test_id}/questions", response_model=List[dict])
+async def get_test_questions(
+    test_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all questions for a test (candidates can access via their assignments)"""
+    test = db.query(Test).filter(Test.id == test_id).first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+    
+    # Get questions with their details
+    test_questions = db.query(TestQuestion, Question).join(
+        Question, TestQuestion.question_id == Question.id
+    ).filter(
+        TestQuestion.test_id == test_id
+    ).order_by(TestQuestion.sort_order).all()
+    
+    return [
+        {
+            "id": str(q.id),
+            "question_text": q.question_text,
+            "question_type": q.question_type,
+            "reading_time_seconds": tq.settings.get("reading_time_seconds") if tq.settings else None or 30,
+            "answer_time_seconds": tq.settings.get("answer_time_seconds") if tq.settings else None or 180,
+            "competency_code": q.competency_code,
+            "sort_order": tq.sort_order
+        }
+        for tq, q in test_questions
+    ]
+
 @router.delete("/{test_id}/questions/{question_id}")
 async def remove_question_from_test(
     test_id: str,
