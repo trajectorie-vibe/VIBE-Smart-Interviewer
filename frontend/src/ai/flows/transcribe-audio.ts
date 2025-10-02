@@ -8,7 +8,7 @@
  * - TranscribeAudioOutput - The return type for the transcribeAudio function.
  */
 
-import {ai} from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import {z} from 'genkit';
 import {TRANSCRIPTION_MODEL} from '@/ai/config';
 
@@ -33,6 +33,7 @@ export async function transcribeAudio(input: TranscribeAudioInput): Promise<Tran
   return transcribeAudioFlow(input);
 }
 
+const ai = getAI();
 const transcribeAudioPrompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: {schema: TranscribeAudioInputSchema},

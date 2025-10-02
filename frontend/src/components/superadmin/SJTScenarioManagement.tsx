@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { apiService as api } from '@/lib/api-service';
 
 type Scenario = { id: string | number; name?: string; situation: string; question: string; assessedCompetency?: string };
 
@@ -25,6 +26,9 @@ export default function SJTScenarioManagement() {
   const [loading, setLoading] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [maxAttempts, setMaxAttempts] = useState<number>(1);
+  // Require selecting a structured SJT test to target assignments correctly
+  const [tests, setTests] = useState<any[]>([]);
+  const [selectedTestId, setSelectedTestId] = useState<string>('');
   // Superadmin now works directly with global scenarios (no company filter)
 
   useEffect(() => {
@@ -39,6 +43,18 @@ export default function SJTScenarioManagement() {
         setScenarios([]);
       } finally {
         setLoading(false);
+      }
+    })();
+  }, []);
+
+  // Load available SJT structured tests to assign
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.listStructuredTests({ test_type: 'SJT' });
+        setTests(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setTests([]);
       }
     })();
   }, []);
@@ -117,6 +133,10 @@ export default function SJTScenarioManagement() {
       toast({ variant: 'destructive', title: 'Pick scenarios', description: 'Select one or more scenarios to assign.' });
       return;
     }
+    if (!selectedTestId) {
+      toast({ variant: 'destructive', title: 'Pick SJT test', description: 'Please select which SJT structured test to assign.' });
+      return;
+    }
     if (!Number.isFinite(maxAttempts) || maxAttempts < 1) {
       toast({ variant: 'destructive', title: 'Invalid attempts', description: 'Please enter a valid number of attempts (minimum 1).' });
       return;
@@ -125,7 +145,7 @@ export default function SJTScenarioManagement() {
     try {
       const payload = {
         user_ids: Array.from(selectedUserIds),
-        test_types: ['SJT'],
+        test_id: selectedTestId,
         max_attempts: maxAttempts,
         sjt_scenario_ids: Array.from(selectedScenarioIds),
       };
@@ -154,6 +174,20 @@ export default function SJTScenarioManagement() {
               <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5"/>Scenarios ({scenarios.length})</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="mb-3">
+                <Label className="text-sm">Target SJT Structured Test</Label>
+                <select
+                  className="mt-1 w-full border rounded px-3 py-2"
+                  value={selectedTestId}
+                  onChange={(e) => setSelectedTestId(e.target.value)}
+                >
+                  <option value="">-- Select SJT test --</option>
+                  {tests.filter(t => (t.test_type || '').toUpperCase() === 'SJT').map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Assignments will be created for the selected SJT test.</p>
+              </div>
               {scenarios.length === 0 ? (
                 <div className="text-sm text-gray-500 space-y-3">
                   <div>No scenarios found. Configure scenarios under Admin → SJT.</div>
@@ -161,7 +195,7 @@ export default function SJTScenarioManagement() {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between mb-2">
-                    <button className="text-sm text-blue-600 hover:underline" onClick={toggleAllScenarios}>{allScenariosSelected ? 'Unselect all' : 'Select all'}</button>
+                    <button className="text-sm text-orange-600 hover:underline" onClick={toggleAllScenarios}>{allScenariosSelected ? 'Unselect all' : 'Select all'}</button>
                   </div>
                   <ul className="divide-y">
                     {scenarios.map(s => (
@@ -173,7 +207,7 @@ export default function SJTScenarioManagement() {
                           <div className="flex-1">
                             <div className="font-medium">{s.name ? s.name : `#${String(s.id)}`} • {s.question}</div>
                             <div className="text-sm text-gray-600 line-clamp-2">{s.situation}</div>
-                            <button className="text-xs text-blue-600 flex items-center gap-1 mt-1" onClick={() => setExpandedScenario(expandedScenario === s.id ? null : s.id)}>
+                            <button className="text-xs text-orange-600 flex items-center gap-1 mt-1" onClick={() => setExpandedScenario(expandedScenario === s.id ? null : s.id)}>
                               {expandedScenario === s.id ? <><ChevronUp className="h-3 w-3"/>Hide</> : <><ChevronDown className="h-3 w-3"/>Preview</>}
                             </button>
                             {expandedScenario === s.id && (
@@ -222,7 +256,7 @@ export default function SJTScenarioManagement() {
                 </div>
               </div>
               <div className="flex items-center gap-3 mb-2 text-sm">
-                <button className="text-blue-600 hover:underline" onClick={toggleAllUsers}>{allUsersSelected ? 'Unselect all' : 'Select all (filtered)'}</button>
+                <button className="text-orange-600 hover:underline" onClick={toggleAllUsers}>{allUsersSelected ? 'Unselect all' : 'Select all (filtered)'}</button>
                 {selectedUserIds.size > 0 && (
                   <button className="text-gray-600 hover:underline" onClick={clearAllUsers}>Clear selection</button>
                 )}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { ProtectedRoute, useAuth } from '@/contexts/auth-context';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { extractAudioFromVideo } from '@/lib/audio-extractor';
 import apiService from '@/lib/api-service';
+import CompetencySelect from '@/components/common/CompetencySelect';
 
 /**
  * Download blob from URL (simplified version without Firebase)
@@ -94,6 +96,8 @@ async function downloadVideoBlob(storageUrl: string): Promise<Blob> {
 
 // Simplified submission management without Firebase
 export default function AdminSubmissionsPage() {
+  const pathname = usePathname();
+  const basePath = pathname?.startsWith('/superadmin') ? '/superadmin' : '/admin';
   const { user, loading, getSubmissions, deleteSubmission } = useAuth();
   const { toast } = useToast();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -107,6 +111,8 @@ export default function AdminSubmissionsPage() {
     audio: false
   });
   const [extractingAudio, setExtractingAudio] = useState<Record<string, boolean>>({});
+  const [competencyFilter, setCompetencyFilter] = useState<string[]>([]);
+  const [prefilterCandidateId, setPrefilterCandidateId] = useState<string | null>(null);
 
   // Load submissions from FastAPI
   useEffect(() => {
@@ -134,23 +140,103 @@ export default function AdminSubmissionsPage() {
     }
   }, [user, toast]);
 
-  // Filter submissions based on search
+  // Read candidate filter from query string on first mount
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredSubmissions(submissions);
-      return;
-    }
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const cid = params.get('candidateId') || params.get('user_id') || params.get('candidate_id');
+    if (cid) setPrefilterCandidateId(cid);
+  }, []);
 
-    const filtered = submissions.filter(submission => 
-      submission.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      submission.candidateName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      submission.competencies?.some(comp => 
-        comp.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
+  // When a specific candidateId is supplied, fetch directly from backend filtered by user_id
+  useEffect(() => {
+    const fetchByCandidate = async () => {
+      if (!prefilterCandidateId || !user) {
+        console.log('[Submissions] Skipping candidate fetch:', { prefilterCandidateId, hasUser: !!user });
+        return;
+      }
+      try {
+        setLoadingSubmissions(true);
+        console.log('[Submissions] Fetching for candidateId:', prefilterCandidateId);
+        const res = await apiService.getSubmissions({ user_id: prefilterCandidateId, candidate_id: prefilterCandidateId as any, limit: 1000 } as any);
+        const raw = res.data || [];
+        console.log('[Submissions] Raw API response:', { count: raw.length, data: raw });
+        const mapped: Submission[] = raw.map((s: any) => {
+          const created = s.created_at || s.createdAt || s.date || null;
+          const report = s.analysis_result ?? s.report ?? null;
+          let status: string = (s.status || '').toString().toLowerCase();
+          if (report && status !== 'completed') status = 'completed';
+          const mappedSubmission = {
+            id: s.id,
+            candidateName: s.candidate_name || s.candidateName,
+            testType: s.test_type || s.testType,
+            date: created,
+            createdAt: created,
+            report,
+            history: s.conversation_history || s.history || [],
+            status,
+            candidateId: s.candidate_id || s.candidateId || s.user_id,
+            candidateLanguage: s.candidate_language || s.candidateLanguage,
+            uiLanguage: s.ui_language || s.uiLanguage,
+            competencies: s.competencies || [],
+          } as Submission;
+          console.log('[Submissions] Mapped submission:', {
+            id: mappedSubmission.id,
+            candidateId: mappedSubmission.candidateId,
+            rawFields: { candidate_id: s.candidate_id, candidateId: s.candidateId, user_id: s.user_id }
+          });
+          return mappedSubmission;
+        });
+        console.log('[Submissions] Final mapped submissions:', mapped.map(m => ({ id: m.id, candidateId: m.candidateId })));
+        setSubmissions(mapped);
+        // Apply current search/competency UI filters immediately
+        setFilteredSubmissions(mapped);
+      } catch (error) {
+        console.error('Error fetching candidate submissions:', error);
+        toast({ title: 'Error', description: 'Failed to load candidate submissions.', variant: 'destructive' });
+      } finally {
+        setLoadingSubmissions(false);
+      }
+    };
+    fetchByCandidate();
+  }, [prefilterCandidateId, user, toast]);
+
+  // Filter submissions based on search and competency selection
+  useEffect(() => {
+    const search = searchTerm.trim().toLowerCase();
+    const hasSearch = search.length > 0;
+    const hasComp = competencyFilter.length > 0;
     
-    setFilteredSubmissions(filtered);
-  }, [searchTerm, submissions]);
+    console.log('[Submissions Filter] Starting filter:', { 
+      hasSearch, 
+      hasComp, 
+      prefilterCandidateId,
+      submissionsCount: submissions.length 
+    });
+    
+    const next = submissions.filter((submission) => {
+      // Search filter
+      const matchesSearch = !hasSearch ||
+        submission.id.toLowerCase().includes(search) ||
+        (submission.candidateName || '').toLowerCase().includes(search) ||
+        (submission.competencies || []).some((comp) => comp.toLowerCase().includes(search));
+
+      if (!matchesSearch) {
+        console.log('[Submissions Filter] Filtered out by search:', submission.id);
+        return false;
+      }
+
+      // NOTE: We do NOT apply candidateId filter here because if prefilterCandidateId exists,
+      // the submissions were ALREADY filtered by the backend API call with user_id parameter.
+      // Double-filtering would incorrectly exclude valid submissions.
+
+      if (!hasComp) return true;
+      const comps = (submission.competencies || []).map((c) => c.toLowerCase());
+      return competencyFilter.every((code) => comps.includes(code.toLowerCase()));
+    });
+
+    setFilteredSubmissions(next);
+  }, [searchTerm, competencyFilter.join('|'), submissions, prefilterCandidateId]);
 
   // Delete submission
   const handleDelete = async (submissionId: string) => {
@@ -396,10 +482,10 @@ export default function AdminSubmissionsPage() {
         
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center gap-4 mb-6">
-            <Link href="/admin">
+            <Link href={basePath}>
               <Button variant="outline" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Admin
+                Back to Dashboard
               </Button>
             </Link>
             <h1 className="text-2xl font-bold">Submission Management</h1>
@@ -418,17 +504,22 @@ export default function AdminSubmissionsPage() {
             
             <CardContent>
               {/* Search and Controls */}
-              <div className="flex flex-col md:flex-row gap-4 mb-6">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    placeholder="Search by ID, candidate name, or competency..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+              <div className="flex flex-col gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Search by ID, candidate name, or competency..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <CompetencySelect value={competencyFilter} onChange={setCompetencyFilter} placeholder="Filter by competencies" />
+                  </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <Label htmlFor="format">Download as:</Label>
                   <div className="flex items-center gap-4">
@@ -510,20 +601,22 @@ export default function AdminSubmissionsPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {submission.createdAt ? new Date(submission.createdAt).toLocaleDateString() : 'Unknown'}
+                          {submission.createdAt || (submission as any).date
+                            ? new Date((submission.createdAt || (submission as any).date) as any).toLocaleDateString()
+                            : 'Unknown'}
                         </TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 text-xs rounded ${
-                            submission.status === 'completed' 
+                            (submission.status || '').toLowerCase() === 'completed'
                               ? 'bg-green-100 text-green-800'
                               : 'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {submission.status || 'In Progress'}
+                            {(submission.status || '').toLowerCase() === 'completed' ? 'Completed' : (submission.status || 'In Progress')}
                           </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Link href={`/admin/report/${submission.id}`}>
+                            <Link href={`${basePath}/report/${submission.id}`}>
                               <Button variant="outline" size="sm">
                                 <Eye className="h-4 w-4 mr-1" />
                                 View

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 import { apiService } from '@/lib/api-service';
 import { configurationService } from '@/lib/config-service';
-import { ai } from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import { submissionService, convertFirestoreSubmission } from '@/lib/database';
 import { analyzeConversation } from '@/ai/flows/analyze-conversation';
 import { analyzeSJTResponse, analyzeSingleCompetency, type AnalyzeSJTResponseInput } from '@/ai/flows/analyze-sjt-response';
@@ -15,6 +15,8 @@ import type { AnalysisResult, QuestionwiseDetail, Competency } from '@/types';
 export async function POST(request: NextRequest) {
   try {
     console.log('🔄 Background report generation API called');
+    // Ensure AI is initialized lazily on server
+    getAI();
     
     const { submissionId, type, analysisInput, forceRegenerate = false } = await request.json();
     
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
       apiService.setAccessTokenForServer(token);
     }
     
-    let analysisResult: AnalysisResult;
+  let analysisResult: AnalysisResult;
     
     if (analysisInput) {
       // Legacy support: Interview type with analysisInput provided

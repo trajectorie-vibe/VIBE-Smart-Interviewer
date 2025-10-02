@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from 'next/navigation';
 import { toast } from "@/hooks/use-toast";
 
 /**
@@ -8,10 +9,16 @@ import { toast } from "@/hooks/use-toast";
  * This keeps error surfacing consistent across the app without per-page plumbing.
  */
 export default function GlobalApiErrorListener() {
+  const router = useRouter();
   useEffect(() => {
     const handler = (e: Event) => {
-      const ce = e as CustomEvent<{ status: number; message: string; endpoint: string }>;
-      const { status, message, endpoint } = ce.detail || { status: 0, message: "Request failed", endpoint: "" };
+      const ce = e as CustomEvent<any>;
+      const detail = (ce && typeof ce.detail === 'object') ? ce.detail : {} as any;
+      const { status, message, endpoint } = {
+        status: typeof detail.status === 'number' ? detail.status : 0,
+        message: typeof detail.message === 'string' ? detail.message : 'Request failed',
+        endpoint: typeof detail.endpoint === 'string' ? detail.endpoint : ''
+      };
 
       // Choose toast variant
       const isAuth = endpoint?.includes("/auth/");
@@ -29,6 +36,14 @@ export default function GlobalApiErrorListener() {
           description: "Please log in again.",
         });
         return;
+      }
+
+      // Centralized auth handling: redirect unauthenticated users to login
+      if (status === 401 || status === 403) {
+        try {
+          router.push('/login');
+          return;
+        } catch {}
       }
 
       toast({

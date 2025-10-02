@@ -172,7 +172,7 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
       </div>
     );
   }
@@ -187,7 +187,7 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
         >
           <Plus className="h-4 w-4" />
           <span>Add Company</span>
@@ -206,7 +206,7 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
                 placeholder="Search companies..."
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
 
@@ -214,7 +214,7 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
             <select
               value={filterActive === 'all' ? 'all' : filterActive.toString()}
               onChange={(e) => { setFilterActive(e.target.value === 'all' ? 'all' : e.target.value === 'true'); setPage(1); }}
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             >
               <option value="all">All Status</option>
               <option value="true">Active</option>
@@ -261,8 +261,8 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
                 <tr key={company.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-blue-600" />
+                      <div className="flex-shrink-0 h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-orange-600" />
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{company.name}</div>
@@ -310,7 +310,7 @@ export default function CompanyManagement({ onBack }: CompanyManagementProps) {
                           setSelectedCompany(company);
                           setShowDetailsModal(true);
                         }}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                        className="text-orange-600 hover:text-orange-900 p-1 rounded"
                         title="View Details"
                       >
                         <Eye className="h-4 w-4" />
@@ -441,7 +441,7 @@ function CreateCompanyModal({ onClose, onSubmit }: {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -487,7 +487,7 @@ function CreateCompanyModal({ onClose, onSubmit }: {
                   };
                   reader.readAsDataURL(file);
                 }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
               {formData.logo_url && (
                 <div className="mt-2">
@@ -507,7 +507,7 @@ function CreateCompanyModal({ onClose, onSubmit }: {
               max="10"
               value={formData.max_test_attempts}
               onChange={(e) => setFormData({ ...formData, max_test_attempts: parseInt(e.target.value) })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
 
@@ -534,7 +534,7 @@ function CreateCompanyModal({ onClose, onSubmit }: {
                         });
                       }
                     }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                   />
                   <span className="ml-2 text-sm text-gray-700">{type}</span>
                 </label>
@@ -548,7 +548,7 @@ function CreateCompanyModal({ onClose, onSubmit }: {
               id="is_active"
               checked={formData.is_active}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
             />
             <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
               Active
@@ -565,7 +565,7 @@ function CreateCompanyModal({ onClose, onSubmit }: {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
             >
               Create Company
             </button>
@@ -614,7 +614,7 @@ function EditCompanyModal({ company, onClose, onSubmit }: {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -660,7 +660,7 @@ function EditCompanyModal({ company, onClose, onSubmit }: {
                   };
                   reader.readAsDataURL(file);
                 }}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
               {(formData.logo_url || (company as any).logo_url) && (
                 <div className="mt-2">
@@ -680,7 +680,7 @@ function EditCompanyModal({ company, onClose, onSubmit }: {
               max="10"
               value={formData.max_test_attempts}
               onChange={(e) => setFormData({ ...formData, max_test_attempts: parseInt(e.target.value) })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
 
@@ -707,7 +707,7 @@ function EditCompanyModal({ company, onClose, onSubmit }: {
                         });
                       }
                     }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                   />
                   <span className="ml-2 text-sm text-gray-700">{type}</span>
                 </label>
@@ -721,7 +721,7 @@ function EditCompanyModal({ company, onClose, onSubmit }: {
               id="is_active_edit"
               checked={formData.is_active}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
             />
             <label htmlFor="is_active_edit" className="ml-2 text-sm text-gray-700">
               Active
@@ -738,7 +738,7 @@ function EditCompanyModal({ company, onClose, onSubmit }: {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
             >
               Update Company
             </button>
@@ -798,7 +798,7 @@ function CompanyDetailsModal({ company, onClose }: {
                   <span className="block text-sm text-gray-600">Allowed Test Types</span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {company.allowed_test_types.map(type => (
-                      <span key={type} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                      <span key={type} className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
                         {type}
                       </span>
                     ))}

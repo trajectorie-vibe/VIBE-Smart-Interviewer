@@ -1,9 +1,15 @@
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/googleai';
-import {DEFAULT_MODEL} from './config';
+import 'server-only';
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/googleai';
+import { DEFAULT_MODEL } from './config';
 
-// Bridge environment variables: prefer GOOGLE_GENAI_API_KEY (native), but accept GEMINI_API_KEY/GOOGLE_API_KEY
-(() => {
+let aiInstance: ReturnType<typeof genkit> | null = null;
+
+// Lazy, server-only initializer to prevent import-time side effects
+export function getAI() {
+  if (aiInstance) return aiInstance;
+
+  // Bridge environment variables once at first use: prefer GOOGLE_GENAI_API_KEY, accept fallbacks
   const hasNative = !!process.env.GOOGLE_GENAI_API_KEY;
   const fallback = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!hasNative && fallback) {
@@ -11,9 +17,10 @@ import {DEFAULT_MODEL} from './config';
     console.log('🔑 Using fallback AI key from GEMINI_API_KEY/GOOGLE_API_KEY for GOOGLE_GENAI_API_KEY');
     process.env.GOOGLE_GENAI_API_KEY = fallback;
   }
-})();
 
-export const ai = genkit({
-  plugins: [googleAI()],
-  model: DEFAULT_MODEL, // Use the model specified in config which reads from .env file
-});
+  aiInstance = genkit({
+    plugins: [googleAI()],
+    model: DEFAULT_MODEL,
+  });
+  return aiInstance;
+}

@@ -7,7 +7,7 @@
  * - GenerateCompetencySummariesOutput - The return type for the function
  */
 
-import {ai} from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import {z} from 'genkit';
 import {SJT_EVALUATION_MODEL} from '@/ai/config';
 
@@ -40,6 +40,7 @@ export async function generateCompetencySummaries(input: GenerateCompetencySumma
   return generateCompetencySummariesFlow(input);
 }
 
+const ai = getAI();
 const prompt = ai.definePrompt({
   name: 'generateCompetencySummariesPrompt',
   input: {schema: GenerateCompetencySummariesInputSchema},

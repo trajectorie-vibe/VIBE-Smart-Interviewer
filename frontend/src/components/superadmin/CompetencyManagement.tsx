@@ -37,6 +37,8 @@ export default function CompetencyManagement() {
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
 
   const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -206,7 +208,7 @@ export default function CompetencyManagement() {
                     <button type="button" key={c} onClick={()=>{
                       setForm(f=>({...f, competency_code:c}));
                       setShowCodeSuggestions(false);
-                    }} className="block w-full text-left px-3 py-2 hover:bg-blue-50 text-sm">{c}</button>
+                    }} className="block w-full text-left px-3 py-2 hover:bg-orange-50 text-sm">{c}</button>
                   ))}
                 </div>
               )}
@@ -241,7 +243,7 @@ export default function CompetencyManagement() {
                     <button type="button" key={n} onClick={()=>{
                       setForm(f=>({...f, competency_name:n}));
                       setShowNameSuggestions(false);
-                    }} className="block w-full text-left px-3 py-2 hover:bg-blue-50 text-sm">{n}</button>
+                    }} className="block w-full text-left px-3 py-2 hover:bg-orange-50 text-sm">{n}</button>
                   ))}
                 </div>
               )}
@@ -281,7 +283,7 @@ export default function CompetencyManagement() {
                         setCategoryQuery(c || '');
                         setShowCategorySuggestions(false);
                       }}
-                      className="block w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
+                      className="block w-full text-left px-3 py-2 hover:bg-orange-50 text-sm"
                     >
                       {c}
                     </button>
@@ -299,7 +301,7 @@ export default function CompetencyManagement() {
             <label htmlFor="active" className="text-sm text-gray-700">Active</label>
           </div>
           <div className="md:col-span-2">
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create</button>
+            <button type="submit" className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">Create</button>
           </div>
         </form>
       </div>
@@ -310,6 +312,34 @@ export default function CompetencyManagement() {
           <div className="flex items-center gap-2">
             <input placeholder="Search" value={search} onChange={e=>{setSearch(e.target.value); setPage(1);}} className="border rounded px-3 py-2" />
             <button onClick={exportCSV} className="px-3 py-2 border rounded hover:bg-gray-50">Download CSV</button>
+            <button onClick={()=> fileRef.current?.click()} className="px-3 py-2 border rounded hover:bg-gray-50">Import CSV</button>
+            <input ref={fileRef} className="hidden" type="file" accept=".csv,text/csv" onChange={async (e)=>{
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setImporting(true);
+              try {
+                const token = (typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null) || localStorage.getItem('access_token');
+                const form = new FormData();
+                form.append('file', file);
+                const res = await fetch(`${baseURL}/api/v1/competencies/import`, { method: 'POST', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: form });
+                if (!res.ok) {
+                  const body = await res.json().catch(()=>({}));
+                  throw new Error(body?.detail || `Import failed (${res.status})`);
+                }
+                await load();
+              } catch (e:any) {
+                setError(e.message || 'Import failed');
+              } finally {
+                setImporting(false);
+                if (e.target) (e.target as HTMLInputElement).value = '';
+              }
+            }} />
+            <button onClick={()=>{
+              const sample = 'competency_code,competency_name,competency_description,category\nCOMM,Communication,Ability to convey ideas effectively,Business';
+              const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = 'competencies_sample.csv'; a.click(); URL.revokeObjectURL(url);
+            }} className="px-3 py-2 border rounded hover:bg-gray-50">Sample CSV</button>
           </div>
         </div>
         {loading ? (

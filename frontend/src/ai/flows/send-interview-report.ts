@@ -9,7 +9,7 @@
  * - SendInterviewReportOutput - The return type for the sendInterviewReport function.
  */
 
-import { ai } from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
 import { sendEmailTool } from '@/ai/tools/email-tool'; // Import the tool
 
@@ -35,6 +35,7 @@ export async function sendInterviewReport(input: SendInterviewReportInput): Prom
   return sendInterviewReportFlow(input);
 }
 
+const ai = getAI();
 const sendInterviewReportFlow = ai.defineFlow(
   {
     name: 'sendInterviewReportFlow',

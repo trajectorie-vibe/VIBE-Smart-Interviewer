@@ -259,19 +259,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         console.log('📖 Fetching submissions via FastAPI');
         const result = await apiService.getSubmissions();
-        const list = (result.data || []).map((s: any) => ({
-          id: s.id,
-          candidateName: s.candidate_name,
-          testType: s.test_type,
-          date: s.created_at,
-          createdAt: s.created_at,
-          report: s.analysis_result || null,
-          history: s.conversation_history || [],
-          status: s.status,
-          candidateId: s.candidate_id,
-          candidateLanguage: s.candidate_language,
-          uiLanguage: s.ui_language,
-        }));
+        const list = (result.data || []).map((s: any) => {
+          // Normalize various field names from backend just in case
+          const created = s.created_at || s.createdAt || s.date || null;
+          const report = s.analysis_result ?? s.report ?? null;
+          let status: string = (s.status || '').toString().toLowerCase();
+          // If report exists and status isn't explicitly completed, mark as completed for UI
+          if (report && status !== 'completed') {
+            status = 'completed';
+          }
+          return {
+            id: s.id,
+            candidateName: s.candidate_name || s.candidateName,
+            testType: s.test_type || s.testType,
+            date: created,
+            createdAt: created,
+            report,
+            history: s.conversation_history || s.history || [],
+            status,
+            candidateId: s.candidate_id || s.candidateId || s.user_id,
+            candidateLanguage: s.candidate_language || s.candidateLanguage,
+            uiLanguage: s.ui_language || s.uiLanguage,
+            competencies: s.competencies || [],
+          };
+        });
         console.log(`✅ Fetched ${list.length} submissions`);
         return list;
       } catch (error) {
@@ -285,18 +296,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const result = await apiService.getSubmission(id);
         if (!result.data) return null;
         const s = result.data as any;
+        const created = s.created_at || s.createdAt || s.date || null;
+        const report = s.analysis_result ?? s.report ?? null;
+        let status: string = (s.status || '').toString().toLowerCase();
+        if (report && status !== 'completed') {
+          status = 'completed';
+        }
         const mapped = {
           id: s.id,
-          candidateName: s.candidate_name,
-          testType: s.test_type,
-          date: s.created_at,
-          createdAt: s.created_at,
-          report: s.analysis_result || null,
-          history: s.conversation_history || [],
-          status: s.status,
-          candidateId: s.candidate_id,
-          candidateLanguage: s.candidate_language,
-          uiLanguage: s.ui_language,
+          candidateName: s.candidate_name || s.candidateName,
+          testType: s.test_type || s.testType,
+          date: created,
+          createdAt: created,
+          report,
+          history: s.conversation_history || s.history || [],
+          status,
+          candidateId: s.candidate_id || s.candidateId || s.user_id,
+          candidateLanguage: s.candidate_language || s.candidateLanguage,
+          uiLanguage: s.ui_language || s.uiLanguage,
+          competencies: s.competencies || [],
         };
         console.log('✅ Submission fetched successfully');
         return mapped;
@@ -346,7 +364,7 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
     if (loading) {
       return (
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
         </div>
       );
     }
@@ -375,7 +393,7 @@ export function withSuperAdminAuth<P extends object>(Component: React.ComponentT
     if (loading) {
       return (
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
         </div>
       );
     }
@@ -420,7 +438,7 @@ export function ProtectedRoute({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
       </div>
     );
   }
@@ -429,7 +447,7 @@ export function ProtectedRoute({
     // Show loading while redirecting
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
       </div>
     );
   }

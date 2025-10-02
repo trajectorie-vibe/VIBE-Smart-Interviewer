@@ -5,7 +5,7 @@
  * This analyzes an entire scenario conversation (including follow-ups) for comprehensive assessment.
  */
 
-import { ai } from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
 import { translateToEnglish } from './translate-text';
 
@@ -43,6 +43,7 @@ export async function analyzeSJTScenario(input: AnalyzeSJTScenarioInput): Promis
   return analyzeSJTScenarioFlow(input);
 }
 
+const ai = getAI();
 const prompt = ai.definePrompt({
   name: 'analyzeSJTScenarioPrompt',
   input: { schema: AnalyzeSJTScenarioInputSchema },

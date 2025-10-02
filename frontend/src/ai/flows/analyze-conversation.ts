@@ -9,7 +9,7 @@
  * - AnalyzeConversationOutput - The return type for the analyzeConversation function.
  */
 
-import {ai} from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import {z} from 'genkit';
 import { translateToEnglish } from './translate-text';
 import { translationService } from '@/lib/translation-service';
@@ -78,6 +78,7 @@ export async function analyzeConversation(input: AnalyzeConversationInput): Prom
   return analyzeConversationFlow(augmentedInput);
 }
 
+const ai = getAI();
 const prompt = ai.definePrompt({
   name: 'analyzeConversationPrompt',
   input: {schema: AnalyzeConversationInputSchema.extend({ competenciesToAssess: z.string() })},

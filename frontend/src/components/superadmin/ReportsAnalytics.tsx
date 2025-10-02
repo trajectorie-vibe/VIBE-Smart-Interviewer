@@ -78,7 +78,7 @@ export default function ReportsAnalytics() {
               <XAxis dataKey="name" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="value" fill="#ea580c" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

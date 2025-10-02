@@ -41,7 +41,7 @@ export default function ContentManagement() {
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">SJT Configuration</h3>
-          <button onClick={() => save("sjt")} disabled={saving} className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">Save</button>
+          <button onClick={() => save("sjt")} disabled={saving} className="px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50">Save</button>
         </div>
         <textarea className="w-full h-48 border rounded p-3 font-mono text-sm" value={JSON.stringify(sjt || {}, null, 2)} onChange={e=>{ try { setSjt(JSON.parse(e.target.value)); } catch { /* ignore */ } }} />
       </div>
@@ -49,7 +49,7 @@ export default function ContentManagement() {
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">JDT Configuration</h3>
-          <button onClick={() => save("jdt")} disabled={saving} className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">Save</button>
+          <button onClick={() => save("jdt")} disabled={saving} className="px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50">Save</button>
         </div>
         <textarea className="w-full h-48 border rounded p-3 font-mono text-sm" value={JSON.stringify(jdt || {}, null, 2)} onChange={e=>{ try { setJdt(JSON.parse(e.target.value)); } catch { /* ignore */ } }} />
       </div>

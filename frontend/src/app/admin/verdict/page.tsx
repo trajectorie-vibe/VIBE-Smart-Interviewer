@@ -196,7 +196,7 @@ const FinalVerdictPage = () => {
 
 
 const ProtectedFinalVerdictPage = () => (
-    <ProtectedRoute adminOnly>
+    <ProtectedRoute allowedRoles={["admin"]}>
         <FinalVerdictPage />
     </ProtectedRoute>
 );

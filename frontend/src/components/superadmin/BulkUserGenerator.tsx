@@ -134,7 +134,7 @@ export default function BulkUserGenerator() {
                 value={selectedTenant}
                 onChange={(e) => setSelectedTenant(e.target.value)}
                 disabled={loadingTenants}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 {loadingTenants && <option value="">Loading companies...</option>}
                 {!loadingTenants && <option value="">Select a company</option>}
@@ -154,7 +154,7 @@ export default function BulkUserGenerator() {
               max={1000}
               value={count}
               onChange={(e) => setCount(parseInt(e.target.value || '0', 10))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
             <p className="text-xs text-gray-500 mt-1">Max 1000 per request</p>
           </div>
@@ -168,7 +168,7 @@ export default function BulkUserGenerator() {
               value={emailPrefix}
               onChange={(e) => setEmailPrefix(e.target.value)}
               placeholder="e.g., CompanyA"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -178,7 +178,7 @@ export default function BulkUserGenerator() {
               value={emailDomain}
               onChange={(e) => setEmailDomain(e.target.value)}
               placeholder="e.g., gmail.com"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
           <div>
@@ -188,7 +188,7 @@ export default function BulkUserGenerator() {
               min={1}
               value={startFrom}
               onChange={(e) => setStartFrom(parseInt(e.target.value || '1', 10))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -201,14 +201,14 @@ export default function BulkUserGenerator() {
               value={namePrefix}
               onChange={(e) => setNamePrefix(e.target.value)}
               placeholder="e.g., Trajectorie Candidate"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Password options</label>
             <div className="flex items-center space-x-3">
               <label className="inline-flex items-center">
-                <input type="checkbox" className="rounded border-gray-300 text-blue-600" checked={useFixedPassword} onChange={(e)=>setUseFixedPassword(e.target.checked)} />
+                <input type="checkbox" className="rounded border-gray-300 text-orange-600" checked={useFixedPassword} onChange={(e)=>setUseFixedPassword(e.target.checked)} />
                 <span className="ml-2 text-sm text-gray-700">Use fixed password</span>
               </label>
               <input
@@ -217,7 +217,7 @@ export default function BulkUserGenerator() {
                 value={fixedPassword}
                 onChange={(e) => setFixedPassword(e.target.value)}
                 disabled={!useFixedPassword}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">If not set, strong random passwords will be generated.</p>
@@ -239,7 +239,7 @@ export default function BulkUserGenerator() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center"
+            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center"
           >
             {submitting ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin"/>Generating...</>) : "Generate Users"}
           </button>

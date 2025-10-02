@@ -22,10 +22,15 @@ export default function Header() {
 
     useEffect(() => {
         (async () => {
-            if (user?.tenant_id) {
-                const res = await apiService.getTenant(user.tenant_id);
-                if (res.data?.logo_url) setTenantLogo(res.data.logo_url);
-                else setTenantLogo(null);
+            if (user?.tenant_id && user.tenant_id !== '00000000-0000-0000-0000-000000000001') {
+                try {
+                    const res = await apiService.getTenant(user.tenant_id);
+                    if (res.data?.logo_url) setTenantLogo(res.data.logo_url);
+                    else setTenantLogo(null);
+                } catch (error) {
+                    console.warn('Failed to load tenant logo:', error);
+                    setTenantLogo(null);
+                }
             } else {
                 setTenantLogo(null);
             }

@@ -25,14 +25,21 @@ import CompanyManagement from '@/components/superadmin/CompanyManagement';
 import UserManagement from '@/components/superadmin/UserManagement';
 import CompetencyManagement from '@/components/superadmin/CompetencyManagement';
 import BulkUserGenerator from '@/components/superadmin/BulkUserGenerator';
-import SJTScenarioManagement from '@/components/superadmin/SJTScenarioManagement';
 import BulkAdminAssignment from '@/components/superadmin/BulkAdminAssignment';
 import TestAssignments from '@/components/superadmin/TestAssignments';
 import TestConfigWizard from '@/components/superadmin/TestConfigWizard';
 import QuestionBankManagement from '@/components/superadmin/QuestionBankManagement';
+import StatusEventsPanel from '@/components/status/StatusEventsPanel';
+import UserUpdatesPanel from '@/components/admin/UserUpdatesPanel';
 
 // Define navigation items for the sidebar
 const navigationItems = [
+  {
+    id: 'updates',
+    label: 'Updates',
+    icon: Bell,
+    description: 'Live user updates and progress overview'
+  },
   {
     id: 'overview',
     label: 'Overview',
@@ -76,12 +83,6 @@ const navigationItems = [
     description: 'Define and manage skill competencies'
   },
   {
-    id: 'sjt',
-    label: 'SJT Scenarios',
-    icon: FileText,
-    description: 'Per-company SJT scenario selection and assignment'
-  },
-  {
     id: 'assign-tests',
     label: 'Assign Tests',
     icon: Target,
@@ -103,7 +104,7 @@ const navigationItems = [
 
 function SuperAdminDashboard() {
   const { user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState('updates');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -122,7 +123,7 @@ function SuperAdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`bg-white shadow-lg transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-64'} flex flex-col`}>
+  <div className={`bg-white shadow-lg transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-64'} flex flex-col`}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -153,12 +154,12 @@ function SuperAdminDashboard() {
                 onClick={() => setActiveSection(item.id)}
                 className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 group ${
                   isActive 
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                    ? 'bg-orange-50 text-orange-700 border border-orange-200' 
                     : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                 }`}
                 title={sidebarCollapsed ? item.label : undefined}
               >
-                <Icon className={`h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-500 group-hover:text-gray-700'}`} />
+                <Icon className={`h-5 w-5 ${isActive ? 'text-orange-600' : 'text-gray-500 group-hover:text-gray-700'}`} />
                 {!sidebarCollapsed && (
                   <span className="ml-3 font-medium">{item.label}</span>
                 )}
@@ -174,7 +175,7 @@ function SuperAdminDashboard() {
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="w-full flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <div className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-full">
+              <div className="flex items-center justify-center w-8 h-8 bg-orange-600 text-white rounded-full">
                 <User className="h-4 w-4" />
               </div>
               {!sidebarCollapsed && (
@@ -220,7 +221,7 @@ function SuperAdminDashboard() {
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
 
@@ -236,14 +237,14 @@ function SuperAdminDashboard() {
 
         {/* Content Area */}
         <main className="flex-1 p-6 overflow-auto">
+          {activeSection === 'updates' && <UserUpdatesPanel context="superadmin" />}
           {activeSection === 'overview' && <OverviewSection />}
           {activeSection === 'companies' && <CompaniesSection />}
           {activeSection === 'users' && <UsersSection />}
           {activeSection === 'bulk-generate' && <BulkGenerateSection />}
           {activeSection === 'competencies' && <CompetenciesSection />}
-          {activeSection === 'sjt' && <SJTSection />}
           {activeSection === 'assign-tests' && <AssignTestsSection />}
-          {activeSection === 'test-wizard' && <TestWizardSection />}
+          {activeSection === 'test-wizard' && <TestWizardSection onOpenQuestionBank={() => setActiveSection('question-bank')} />}
           {activeSection === 'question-bank' && <QuestionBankSection />}
           {activeSection === 'assign-users-admin' && <BulkAdminAssignment />}
           {activeSection === 'settings' && <SettingsSection />}
@@ -290,16 +291,15 @@ function OverviewSection() {
   }, []);
 
   return (
-    <div className="space-y-6">
+        <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Key Metrics Cards */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Companies</p>
               <p className="text-3xl font-bold text-gray-900">{loading ? '—' : (stats?.companies?.total ?? 0)}</p>
             </div>
-            <Building2 className="h-8 w-8 text-blue-600" />
+                <Building2 className="h-8 w-8 text-orange-600" />
           </div>
           <p className="text-sm text-green-600 mt-2">{loading ? '—' : `+${stats?.companies?.added_last_7_days ?? 0} last 7 days`}</p>
         </div>
@@ -310,7 +310,7 @@ function OverviewSection() {
               <p className="text-sm font-medium text-gray-600">Active Users</p>
               <p className="text-3xl font-bold text-gray-900">{loading ? '—' : (stats?.users?.active_total ?? 0)}</p>
             </div>
-            <Users className="h-8 w-8 text-green-600" />
+                <Users className="h-8 w-8 text-orange-600" />
           </div>
           <p className="text-sm text-green-600 mt-2">{loading ? '—' : `+${stats?.users?.added_last_7_days ?? 0} last 7 days`}</p>
         </div>
@@ -321,13 +321,16 @@ function OverviewSection() {
               <p className="text-sm font-medium text-gray-600">Tests Completed</p>
               <p className="text-3xl font-bold text-gray-900">{loading ? '—' : (stats?.submissions?.total ?? 0)}</p>
             </div>
-            <FileText className="h-8 w-8 text-purple-600" />
+                <FileText className="h-8 w-8 text-orange-600" />
           </div>
           <p className="text-sm text-green-600 mt-2">{loading ? '—' : `+${stats?.submissions?.last_24_hours ?? 0} last 24h`}</p>
         </div>
 
         {/* System Health card removed until a meaningful metric is implemented */}
       </div>
+
+      {/* Status panel */}
+      <StatusEventsPanel title="Recent Activity" />
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -344,7 +347,7 @@ function OverviewSection() {
             <span className="text-xs text-gray-500 ml-auto">{loading ? '' : 'just now'}</span>
           </div>
           <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
             <span className="text-sm text-gray-700">Users and companies reflect live data</span>
             <span className="text-xs text-gray-500 ml-auto">auto</span>
           </div>
@@ -370,16 +373,13 @@ function CompetenciesSection() {
   return <CompetencyManagement />;
 }
 
-function SJTSection() {
-  return <SJTScenarioManagement />;
-}
 
 function AssignTestsSection() {
   return <TestAssignments />;
 }
 
-function TestWizardSection() {
-  return <TestConfigWizard />;
+function TestWizardSection({ onOpenQuestionBank }: { onOpenQuestionBank?: () => void } = {}) {
+  return <TestConfigWizard onOpenQuestionBank={onOpenQuestionBank} />;
 }
 
 function QuestionBankSection() {

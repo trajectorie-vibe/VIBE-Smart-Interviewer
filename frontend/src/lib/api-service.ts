@@ -63,6 +63,24 @@ export interface BulkUserGenerateResponse {
   credentials: GeneratedCredential[];
 }
 
+export interface AssignmentSummary {
+  id: string;
+  code: string;
+  name: string;
+  test_id: string;
+  test_name?: string | null;
+  delivery_mode: string;
+  language_code: string;
+  status?: string;
+  progress_percent?: number | null;
+  open_at?: string | null;
+  deadline_at?: string | null;
+  company_id?: string | null;
+  company_name?: string | null;
+  metadata?: Record<string, any> | null;
+  total_time_limit_minutes?: number | null;
+}
+
 export interface AuthTokens {
   access_token: string;
   refresh_token: string;
@@ -335,6 +353,18 @@ class FastAPIService {
     });
   }
 
+  async importUsersCSV(file: File, options?: { tenant_id?: string }): Promise<ApiResponse<{ created: number; skipped: number }>> {
+    const form = new FormData();
+    form.append('file', file);
+    const searchParams = new URLSearchParams();
+    if (options?.tenant_id) searchParams.set('tenant_id', options.tenant_id);
+    const suffix = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request<{ created: number; skipped: number }>(`/api/v1/users/import-csv${suffix}`, {
+      method: 'POST',
+      body: form,
+    } as any);
+  }
+
   // Tenant management
   async getTenants(params?: {
     is_active?: boolean;
@@ -426,8 +456,13 @@ class FastAPIService {
         return acc;
       }, {} as Record<string, string>)
     ).toString() : '';
+    console.log('[ApiService getSubmissions] Params:', params, 'Query string:', queryString);
     // Submissions API is under /api/v1
-    return this.request<any[]>(`/api/v1/submissions${queryString}`);
+    const url = `/api/v1/submissions${queryString}`;
+    console.log('[ApiService getSubmissions] Calling URL:', url);
+    const response = await this.request<any[]>(url);
+    console.log('[ApiService getSubmissions] Response:', { count: response.data?.length, data: response.data });
+    return response;
   }
 
   async getSubmission(submissionId: string): Promise<ApiResponse<any>> {
@@ -500,14 +535,39 @@ class FastAPIService {
     return this.request<any[]>(`/api/v1/assignments/tests${query}`);
   }
 
+  async getMyAssignments(): Promise<ApiResponse<AssignmentSummary[]>> {
+    return this.request<AssignmentSummary[]>('/api/v1/assignments/my-tests');
+  }
+
+  async startMyAssignment(assignmentId: string): Promise<ApiResponse<AssignmentSummary>> {
+    return this.request<AssignmentSummary>(`/api/v1/assignments/my-tests/${assignmentId}/start`, {
+      method: 'POST',
+    });
+  }
+
+  async getAssignmentTimeline(assignmentId: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/assignments/${assignmentId}/timeline`);
+  }
+
   async bulkAssignTests(payload: {
     user_ids: string[];
-    test_types?: string[];
-    test_id?: string;
+    test_id: string;
+    // Optional legacy fields are accepted but ignored by backend
     due_date?: string;
     max_attempts?: number;
     notes?: string;
-    sjt_scenario_ids?: (string|number)[];
+    // New delivery/config fields
+    company_id?: string;
+    name?: string;
+    delivery_mode?: 'video'|'audio'|'text';
+    total_time_limit_minutes?: number;
+    per_question_time_seconds?: number;
+    follow_up_count?: number;
+    follow_up_penalty_percent?: number;
+    prep_time_seconds?: number;
+    answer_time_seconds?: number;
+    re_record_limit?: number;
+    camera_check_enabled?: boolean;
   }): Promise<ApiResponse<any[]>> {
     return this.request<any[]>(`/api/v1/assignments/tests/bulk`, {
       method: 'POST',
@@ -527,6 +587,38 @@ class FastAPIService {
       method: 'DELETE',
     });
   }
+
+  // Configurations
+  async getConfigurations(params?: { config_type?: string; tenant_id?: string }): Promise<ApiResponse<any[]>> {
+    const query = params ? '?' + new URLSearchParams(
+      Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
+    ).toString() : '';
+    return this.request<any[]>(`/api/v1/configurations${query}`);
+  }
+
+  // Test attempts
+  async getTestAttempts(params?: { user_id?: string; test_type?: string }): Promise<ApiResponse<any[]>> {
+    const query = params ? '?' + new URLSearchParams(
+      Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
+    ).toString() : '';
+    return this.request<any[]>(`/api/v1/test-attempts${query}`);
+  }
+
+  async createTestAttempt(data: { user_id: string; test_type: string; assignment_id: string; status: string }): Promise<ApiResponse<any>> {
+    return this.request<any>('/api/v1/test-attempts', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateTestAttempt(attemptId: string, data: { status?: string; [key: string]: any }): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/test-attempts/${attemptId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+
 
   async importTestAssignmentsCSV(file: File, options?: { test_id?: string; test_type?: string; tenant_id?: string }): Promise<ApiResponse<any[]>> {
     const form = new FormData();
@@ -556,6 +648,15 @@ class FastAPIService {
       Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
     ).toString() : '';
     return this.request<any[]>(`/api/v1/tests-structured${query}`);
+  }
+
+  // Fetch a single structured test by ID
+  async getStructuredTest(test_id: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/v1/tests-structured/${encodeURIComponent(test_id)}`);
+  }
+
+  async getStructuredTestQuestions(test_id: string): Promise<ApiResponse<any[]>> {
+    return this.request<any[]>(`/api/v1/tests-structured/${encodeURIComponent(test_id)}/questions`);
   }
 
   async createStructuredTest(payload: { name: string; description: string; test_type: 'SJT'|'JDT'|'CASE'; scope?: 'system'|'tenant'; tenant_id?: string | null; config?: any }): Promise<ApiResponse<any>> {

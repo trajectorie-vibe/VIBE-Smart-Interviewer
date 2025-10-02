@@ -136,7 +136,7 @@ export default function BulkAdminAssignment() {
                 )}
               </div>
               <div className="flex items-center gap-3 mt-2 text-sm">
-                <button className="text-blue-600 hover:underline" onClick={toggleAllUsers}>Select all (filtered)</button>
+                <button className="text-orange-600 hover:underline" onClick={toggleAllUsers}>Select all (filtered)</button>
                 {selectedUserIds.size > 0 && (
                   <button className="text-gray-600 hover:underline" onClick={clearAllUsers}>Clear selection</button>
                 )}

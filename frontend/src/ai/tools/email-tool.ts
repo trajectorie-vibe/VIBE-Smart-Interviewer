@@ -5,7 +5,7 @@
  * Currently, this tool simulates email sending by logging to the console.
  */
 
-import { ai } from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const SendEmailInputSchema = z.object({
@@ -21,6 +21,7 @@ const SendEmailOutputSchema = z.object({
 });
 export type SendEmailOutput = z.infer<typeof SendEmailOutputSchema>;
 
+const ai = getAI();
 export const sendEmailTool = ai.defineTool(
   {
     name: 'sendEmailTool',

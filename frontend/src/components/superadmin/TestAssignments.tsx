@@ -21,6 +21,13 @@ export default function TestAssignments() {
   const [maxAttempts, setMaxAttempts] = useState<number>(1);
   const [dueDate, setDueDate] = useState<string>('');
   const [notes, setNotes] = useState('');
+  // New extended settings
+  const [deliveryMode, setDeliveryMode] = useState<'video'|'audio'|'text'>('video');
+  const [totalTimeMinutes, setTotalTimeMinutes] = useState<number>(10); // default 10 minutes
+  const [perQuestionMinutes, setPerQuestionMinutes] = useState<number>(0);
+  const [followUps, setFollowUps] = useState<number>(2); // default 2 follow-ups
+  const [penaltyPercent, setPenaltyPercent] = useState<number>(10); // default 10%
+  const [cameraCheck, setCameraCheck] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,7 +39,10 @@ export default function TestAssignments() {
         apiService.listStructuredTests(),
       ]);
       setUsers(u.data?.users || []);
-      setTests((t.data as any[]) || []);
+      const rawTests = (t.data as any[]) || [];
+      // Deduplicate by id to avoid duplicate options in dropdown
+      const uniq = Array.from(new Map(rawTests.map((x:any)=> [x.id, x])).values());
+      setTests(uniq);
     })();
   }, []);
 
@@ -64,18 +74,43 @@ export default function TestAssignments() {
     if (selectedUsers.size === 0) { toast({ variant:'destructive', title:'Pick candidates' }); return; }
     setLoading(true);
     try {
-      const res = await apiService.bulkAssignTests({
+      // Find the selected structured test to extract its test_type
+      const selectedTest = tests.find(t => String(t.id) === String(selectedTestId));
+      const payload: any = {
         user_ids: Array.from(selectedUsers),
         test_id: selectedTestId,
-        max_attempts: maxAttempts,
-        due_date: dueDate || undefined,
-        notes,
-      });
+        // Always include these to satisfy backend required fields while keeping UI defaults
+        max_attempts: maxAttempts || 1,
+        delivery_mode: deliveryMode,
+        camera_check_enabled: !!cameraCheck,
+        language_code: 'en',
+      };
+      // Include test_types alongside test_id to satisfy backend Pydantic validation
+      if (selectedTest?.test_type) {
+        payload.test_types = [selectedTest.test_type];
+      }
+      // Default due date = now + 7 days if empty
+      const due = dueDate
+        ? new Date(dueDate).toISOString()
+        : new Date(Date.now() + 7*24*60*60*1000).toISOString();
+      payload.due_date = due;
+      if (notes && notes.trim().length > 0) payload.notes = notes.trim();
+      // Default total time 10 minutes already set in state; include explicitly
+      if (totalTimeMinutes > 0) payload.total_time_limit_minutes = totalTimeMinutes;
+      if (perQuestionMinutes > 0) payload.per_question_time_seconds = perQuestionMinutes * 60;
+      // include defaults (2 and 10) explicitly
+      payload.follow_up_count = followUps;
+      payload.follow_up_penalty_percent = penaltyPercent;
+      // name: provide a default label for the batch assignment
+      payload.name = `Batch ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+
+      const res = await apiService.bulkAssignTests(payload);
       if (res.error) throw new Error(res.error);
       toast({ title: 'Assigned', description: `Created ${res.data?.length || 0} assignments.` });
       setSelectedUsers(new Set());
     } catch (e:any) {
-      toast({ variant:'destructive', title:'Failed to assign', description: e.message || 'Unknown error' });
+      const message = e?.message || 'Unknown error';
+      toast({ variant:'destructive', title:'Failed to assign', description: message });
     } finally { setLoading(false); }
   };
 
@@ -85,7 +120,11 @@ export default function TestAssignments() {
     if (!file) return;
     setLoading(true);
     try {
-      const res = await apiService.importTestAssignmentsCSV(file, { test_id: selectedTestId || undefined });
+      const selectedTest = tests.find(t => String(t.id) === String(selectedTestId));
+      const res = await apiService.importTestAssignmentsCSV(file, {
+        test_id: selectedTestId || undefined,
+        test_type: selectedTest?.test_type || undefined,
+      });
       if (res.error) throw new Error(res.error);
       toast({ title: 'Imported', description: `Created ${res.data?.length || 0} assignments from CSV.` });
     } catch (e:any) {
@@ -131,6 +170,38 @@ export default function TestAssignments() {
             <div>
               <Label className="text-sm">Due Date</Label>
               <Input type="datetime-local" value={dueDate} onChange={(e)=> setDueDate(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="text-sm">Delivery Mode</Label>
+              <select className="border rounded px-3 py-2 w-full" value={deliveryMode} onChange={(e)=> setDeliveryMode(e.target.value as any)}>
+                <option value="video">Video + Audio</option>
+                <option value="audio">Audio Only</option>
+                <option value="text">Text Only</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-sm">Total Time (min)</Label>
+              <Input type="number" value={totalTimeMinutes} onChange={(e)=> setTotalTimeMinutes(parseInt(e.target.value||'0'))} placeholder="0 = unlimited" />
+            </div>
+            <div>
+              <Label className="text-sm">Per Question (min)</Label>
+              <Input type="number" value={perQuestionMinutes} onChange={(e)=> setPerQuestionMinutes(parseInt(e.target.value||'0'))} placeholder="0 = no limit" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="text-sm">AI Follow-ups</Label>
+              <Input type="number" min={0} max={5} value={followUps} onChange={(e)=> setFollowUps(parseInt(e.target.value||'0'))} />
+            </div>
+            <div>
+              <Label className="text-sm">Penalty %</Label>
+              <Input type="number" min={0} max={100} value={penaltyPercent} onChange={(e)=> setPenaltyPercent(parseInt(e.target.value||'0'))} />
+            </div>
+            <div className="flex items-end gap-2">
+              <input id="cameraCheckAssign" className="h-4 w-4" type="checkbox" checked={cameraCheck} onChange={(e)=> setCameraCheck(e.target.checked)} />
+              <Label htmlFor="cameraCheckAssign" className="text-sm">Require camera check</Label>
             </div>
           </div>
           <div>

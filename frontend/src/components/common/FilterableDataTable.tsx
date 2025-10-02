@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ export interface FilterableDataTableProps<T> {
   onToggleAllFiltered?: () => void;
   actionsRight?: React.ReactNode;
   emptyText?: string;
+  enableColumnFilters?: boolean;
 }
 
 export function FilterableDataTable<T extends object>({
@@ -37,11 +38,27 @@ export function FilterableDataTable<T extends object>({
   actionsRight,
   emptyText = 'No data',
 }: FilterableDataTableProps<T>) {
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+
   const filtered = useMemo(() => {
     const q = (search || '').toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
-  }, [rows, search]);
+    let base = rows;
+    if (q) {
+      base = base.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
+    }
+    // Apply per-column filters (contains match on stringified cell)
+    const keys = Object.keys(columnFilters).filter((k) => (columnFilters[k] || '').trim().length > 0);
+    if (keys.length === 0) return base;
+    return base.filter((row) => {
+      for (const k of keys) {
+        const needle = (columnFilters[k] || '').toLowerCase();
+        const val = (row as any)[k];
+        const hay = (val === undefined || val === null) ? '' : String(val).toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [rows, search, columnFilters]);
 
   return (
     <div className="space-y-3">
@@ -62,6 +79,22 @@ export function FilterableDataTable<T extends object>({
               )}
               {columns.map((c) => (
                 <TableHead key={String(c.key)} style={{ width: c.width }}>{c.header}</TableHead>
+              ))}
+            </TableRow>
+            {/* Column filter inputs */}
+            <TableRow>
+              {selected && onToggleAllFiltered && (
+                <TableHead className="w-10"></TableHead>
+              )}
+              {columns.map((c) => (
+                <TableHead key={String(c.key)}>
+                  <Input
+                    placeholder="filter"
+                    className="h-7 text-xs"
+                    value={columnFilters[String(c.key)] || ''}
+                    onChange={(e)=> setColumnFilters((prev) => ({ ...prev, [String(c.key)]: e.target.value }))}
+                  />
+                </TableHead>
               ))}
             </TableRow>
           </TableHeader>

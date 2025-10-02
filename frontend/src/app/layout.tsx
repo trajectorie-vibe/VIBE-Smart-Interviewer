@@ -46,12 +46,8 @@ export default function RootLayout({
         <AuthProvider>
           <LanguageProvider>
             <UserList />
-            <div className="animation-container">
-              <div className="blob blob-1" />
-              <div className="blob blob-2" />
-              <div className="blob blob-3" />
-            </div>
-            <main className="relative z-10">
+            {/* Simplified brand theme container (white/orange/red) */}
+            <main className="relative z-10 bg-white min-h-screen">
               <GlobalApiErrorListener />
               {children}
             </main>

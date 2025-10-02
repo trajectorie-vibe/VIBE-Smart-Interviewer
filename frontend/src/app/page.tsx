@@ -1,385 +1,81 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ProtectedRoute, useAuth } from '@/contexts/auth-context';
-import Header from '@/components/header';
-import Image from 'next/image';
-import { ArrowRightCircle, Headphones, ListChecks, Info, FileText, Briefcase, X, Eye } from 'lucide-react';
-import { configurationService, getSjtFollowUpCount } from '@/lib/config-service';
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Header from "@/components/header";
+import { useAuth } from "@/contexts/auth-context";
+import { apiService, type AssignmentSummary } from "@/lib/api-service";
+import AssignedTestCard from "@/components/candidate/assigned-test-card";
+import { Info } from "lucide-react";
 
-const Stepper = () => (
-  <div className="w-full max-w-4xl mx-auto my-12">
-    <div className="flex items-center">
-      <Step number={1} title="Skills Gauge not an exam" isFirst />
-      <Step number={2} title="Everyday scenarios" />
-      <Step number={3} title="Total assessment 02" />
-      <Step number={4} title="Get Report instantly" isLast />
-    </div>
-  </div>
-);
-
-const Step = ({ number, title, isFirst = false, isLast = false }: { number: number; title: string; isFirst?: boolean; isLast?: boolean }) => (
-  <div className="flex-1 flex items-center">
-    {!isFirst && <div className="flex-1 border-t-2 border-gray-300"></div>}
-    <div className="flex flex-col items-center text-gray-500 relative">
-      <div className="rounded-full transition duration-500 ease-in-out h-16 w-16 border-2 border-gray-300 flex items-center justify-center relative bg-white">
-        <div className="absolute inset-0 rounded-full border-[6px] border-white"></div>
-        <div className="font-bold text-red-600 text-4xl z-10">{number.toString().padStart(2, '0')}</div>
-        <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[8px] border-r-red-500 transform rotate-180 z-20"></div>
-        <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-l-[8px] border-l-red-500 z-20"></div>
-      </div>
-      <div className="text-center w-32 text-base font-medium uppercase mt-4">{title}</div>
-    </div>
-    {!isLast && <div className="flex-1 border-t-2 border-gray-300"></div>}
-  </div>
-);
-
-
-const AssessmentCard = ({ 
-  title, 
-  icon, 
-  decide, 
-  howItWorks, 
-  remember, 
-  questions, 
-  attempts, 
-  link, 
-  isDisabled = false, 
-  currentAttempts = 0,
-  maxAttempts = 1,
-  hasReport = false,
-  onViewReport,
-  notConfigured = false,
-  inProgress = false
-}: { 
-  title: string; 
-  icon: React.ReactNode; 
-  decide: string; 
-  howItWorks: string; 
-  remember: string; 
-  questions: string; 
-  attempts: string; 
-  link: string; 
-  isDisabled?: boolean; 
-  currentAttempts?: number;
-  maxAttempts?: number;
-  hasReport?: boolean;
-  onViewReport?: () => void;
-  notConfigured?: boolean;
-  inProgress?: boolean;
-}) => (
-    <div className="border border-gray-200 flex flex-col rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-        <div className={`p-4 flex-grow ${isDisabled ? 'opacity-50 bg-gray-50' : ''}`}>
-            <h3 className="text-red-600 font-bold border-b-2 border-red-200 pb-1 mb-3 text-2xl flex items-center gap-2">{icon} {title}</h3>
-            <div className="text-lg space-y-3 text-gray-700">
-                <p><span className="font-bold">Decide:</span> {decide}</p>
-                <p><span className="font-bold">How it works:</span> {howItWorks}</p>
-                <p><span className="font-bold">Remember:</span> {remember}</p>
-            </div>
-        </div>
-        <div className={`bg-gray-100 p-4 border-t border-b border-gray-200 ${isDisabled ? 'opacity-50' : ''}`}>
-            <div className="grid grid-cols-2 gap-4 text-center">
-                <div>
-                    <p className="text-base text-gray-500">No. of questions</p>
-                    <p className="text-3xl font-bold text-gray-700">{questions}</p>
-                </div>
-                <div>
-                    <p className="text-base text-gray-500">Attempts Used</p>
-                    <p className={`text-3xl font-bold ${isDisabled ? 'text-red-600' : 'text-gray-700'}`}>
-                      {currentAttempts}/{maxAttempts}
-                    </p>
-                </div>
-            </div>
-        </div>
-        <div className={`bg-green-800 text-white p-2 text-sm ${isDisabled ? 'opacity-50' : ''}`}>
-            <div className="flex justify-between items-center px-2">
-                <span className="flex items-center gap-2"><Headphones className="h-4 w-4" /> Headphones needed</span>
-                <span>Yes</span>
-            </div>
-             <div className="flex justify-between items-center px-2 mt-1">
-                <span className="flex items-center gap-2"><ListChecks className="h-4 w-4" /> Complete all questions</span>
-                <span>{maxAttempts} attempt{maxAttempts > 1 ? 's' : ''}</span>
-            </div>
-        </div>
-        {isDisabled ? (
-          <div className="bg-gray-50">
-            <div className="w-full bg-gray-400 text-white font-bold py-3 flex items-center justify-center cursor-not-allowed">
-              <X className="mr-2 h-5 w-5" />
-              {notConfigured ? 'Configuration pending' : inProgress ? 'Attempt already in progress' : currentAttempts >= maxAttempts ? 'Maximum attempts reached' : 'Unavailable'}
-            </div>
-            {hasReport && (
-              <button 
-                onClick={onViewReport}
-                className="w-full bg-blue-500 text-white font-bold py-3 flex items-center justify-center hover:bg-blue-600 transition-all duration-200 border-t border-gray-300 shadow-md hover:shadow-lg"
-              >
-                <Eye className="mr-2 h-5 w-5" />
-                View Report
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="bg-gray-50">
-            <Link href={link} className="block">
-                <button className="w-full bg-green-600 text-white font-bold py-3 flex items-center justify-center hover:bg-green-700 transition-colors">
-                    Start <ArrowRightCircle className="ml-3" />
-                </button>
-            </Link>
-            {hasReport && (
-              <button 
-                onClick={onViewReport}
-                className="w-full bg-blue-500 text-white font-bold py-3 flex items-center justify-center hover:bg-blue-600 transition-all duration-200 border-t border-gray-300 shadow-md hover:shadow-lg"
-              >
-                <Eye className="mr-2 h-5 w-5" />
-                View Report
-              </button>
-            )}
-          </div>
-        )}
-    </div>
-);
-
-
-function SelectionPage() {
+export default function Home() {
   const router = useRouter();
-  const { getUserAttempts, getLatestUserSubmission, user } = useAuth();
-  // Availability state from backend
-  const [jdtAvailability, setJdtAvailability] = useState<any>(null);
-  const [sjtAvailability, setSjtAvailability] = useState<any>(null);
+  const { isAuthenticated, isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [sjtAttempts, setSjtAttempts] = useState(0);
-  const [jdtAttempts, setJdtAttempts] = useState(0);
-  const [hasJdtReport, setHasJdtReport] = useState(false);
-  const [hasSjtReport, setHasSjtReport] = useState(false);
-  const [sjtQuestionCount, setSjtQuestionCount] = useState(5);
-  const [sjtHasFollowUps, setSjtHasFollowUps] = useState(false);
-  const [jdtQuestionCount, setJdtQuestionCount] = useState(5);
-  // Raw assignments fallback + tracking whether we attempted fetch
-  const [assignedTestTypes, setAssignedTestTypes] = useState<string[]>([]);
-  const [assignmentFetchTried, setAssignmentFetchTried] = useState(false);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-  
-  const MAX_ATTEMPTS_FALLBACK = 1; // Fallback if backend not ready
+  const [assignments, setAssignments] = useState<AssignmentSummary[] | null>(null);
 
   useEffect(() => {
-    const loadConfiguration = async () => {
-      try {
-        console.log('🔧 Loading configuration from database...');
-  const token = (typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null) || localStorage.getItem('access_token');
-        // New summary endpoint reduces request count and flakiness
-        let jdtAvail: any = null;
-        let sjtAvail: any = null;
-        if (token) {
-          const summaryRes = await fetch(`${API_BASE}/api/v1/tests/availability/summary`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (summaryRes.ok) {
-            const summary = await summaryRes.json();
-            if (summary?.tests) {
-              jdtAvail = summary.tests.find((t: any) => t.test_type === 'JDT') || null;
-              sjtAvail = summary.tests.find((t: any) => t.test_type === 'SJT') || null;
-            }
-          } else {
-            console.warn('⚠️ Summary availability fetch failed; falling back to individual calls');
-            const single = async (tt: 'JDT'|'SJT') => {
-              const r = await fetch(`${API_BASE}/api/v1/tests/availability?test_type=${tt}`, { headers: { 'Authorization': `Bearer ${token}` }});
-              if (r.ok) return r.json();
-              return null;
-            };
-            [jdtAvail, sjtAvail] = await Promise.all([single('JDT'), single('SJT')]);
-          }
-        }
-        setJdtAvailability(jdtAvail);
-        setSjtAvailability(sjtAvail);
-
-        // Fallback: fetch raw assignments if availability missing OR not assigned
-        try {
-          const token = (typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null) || localStorage.getItem('access_token');
-          if (!token) {
-            console.warn('⚠️ No access_token found when attempting assignment fallback fetch');
-          } else {
-            const asRes = await fetch(`${API_BASE}/api/v1/assignments/my-tests`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setAssignmentFetchTried(true);
-            if (!asRes.ok) {
-              console.warn(`⚠️ assignments/my-tests fetch failed status=${asRes.status}`);
-            } else {
-              const assignments = await asRes.json();
-              console.log('📦 Raw assignments fetched:', assignments);
-              const types = (assignments || []).map((a: any) => (a.test_type || '').toUpperCase()).filter(Boolean);
-              setAssignedTestTypes(types);
-            }
-          }
-        } catch (e) {
-          setAssignmentFetchTried(true);
-          console.warn('⚠️ Could not fetch assignments fallback', e);
-        }
-
-        if (sjtAvail && typeof sjtAvail.attempts_used === 'number') {
-          setSjtAttempts(sjtAvail.attempts_used);
-        } else {
-          const sjtAttemptsCount = await getUserAttempts('SJT');
-          setSjtAttempts(sjtAttemptsCount);
-        }
-        if (jdtAvail && typeof jdtAvail.attempts_used === 'number') {
-          setJdtAttempts(jdtAvail.attempts_used);
-        } else {
-          const jdtAttemptsCount = await getUserAttempts('JDT');
-          setJdtAttempts(jdtAttemptsCount);
-        }
-        // Prefer backend-provided exact assigned count for SJT; fallback to config
-        const jdtConfig = await configurationService.getJDTConfig();
-        const sjtConfig = await configurationService.getSJTConfig();
-        if (sjtAvail && typeof sjtAvail.assigned_question_count === 'number') {
-          setSjtQuestionCount(sjtAvail.assigned_question_count);
-        } else if (sjtConfig?.settings?.numberOfQuestions) {
-          setSjtQuestionCount(sjtConfig.settings.numberOfQuestions);
-        }
-        if (sjtConfig?.settings) {
-          const fu = getSjtFollowUpCount(sjtConfig.settings);
-          setSjtHasFollowUps(!!fu && fu > 0);
-        }
-        if (jdtConfig?.settings?.numberOfQuestions) {
-          const manualQuestions = jdtConfig.settings.numberOfQuestions || 0;
-          const aiQuestions = jdtConfig.settings.aiGeneratedQuestions || 0;
-          setJdtQuestionCount(manualQuestions + aiQuestions);
-        }
-        
-        // Check for existing reports
-        const sjtSubmission = await getLatestUserSubmission('SJT');
-        const jdtSubmission = await getLatestUserSubmission('JDT');
-        setHasSjtReport(!!sjtSubmission);
-        setHasJdtReport(!!jdtSubmission);
-        
-  console.log('✅ Availability & configuration loaded from backend');
-  console.log(`📄 Reports - SJT: ${!!sjtSubmission}, JDT: ${!!jdtSubmission}`);
-      } catch (error) {
-        console.error('❌ Error loading configuration from database:', error);
-      } finally {
-        setLoading(false);
+    let mounted = true;
+    async function load() {
+      // If user is not authenticated, send to login
+      if (!isAuthenticated) {
+        router.replace('/login');
+        return;
       }
-    };
-
-    loadConfiguration();
-  }, [getUserAttempts, user]);
-
-  // Show card only if assigned to the user (hide unassigned tests entirely)
-  const showJDT = !!(jdtAvailability && jdtAvailability.assigned) || assignedTestTypes.includes('JDT');
-  const showSJT = !!(sjtAvailability && sjtAvailability.assigned) || assignedTestTypes.includes('SJT');
-
-  // Debug instrumentation to help diagnose invisibility
-  if (!loading && !showJDT && !showSJT && assignmentFetchTried) {
-    console.debug('[Dashboard Debug] No tests visible. jdtAvailability=', jdtAvailability, 'sjtAvailability=', sjtAvailability, 'assignedTestTypes=', assignedTestTypes);
-  }
-
-  const handleViewSjtReport = () => {
-    router.push('/report/SJT');
-  };
-
-  const handleViewJdtReport = () => {
-    router.push('/report/JDT');
-  };
+      // If authenticated and admin/superadmin, send to their dashboards
+      if (isSuperAdmin) {
+        router.replace('/superadmin');
+        return;
+      }
+      if (isAdmin) {
+        router.replace('/admin');
+        return;
+      }
+      // Candidate - redirect to candidate dashboard
+      router.replace('/candidate');
+    }
+    load();
+    return () => { mounted = false; };
+  }, [isAuthenticated, isAdmin, isSuperAdmin, router]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex min-h-screen flex-col bg-white">
       <Header />
-      <main className="flex-grow flex flex-col items-center p-4">
-        <div className="w-full max-w-5xl mx-auto">
-            <div className="relative h-48 bg-gray-200 mb-12 rounded-lg overflow-hidden">
-                <Image src="https://placehold.co/1200x250.png" layout="fill" objectFit="cover" alt="Skills Gauge Banner" data-ai-hint="professional banner" />
-                <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center text-white text-center p-4">
-                    <h1 className="text-5xl font-bold">Skill Gauge</h1>
-                    <p className="mt-2 text-lg">Skills Gauge is a combination of Assessments, which are predictive of future performance on the job.</p>
-                </div>
-            </div>
-            
-            <Stepper />
+      <main className="flex-1">
+        <div className="mx-auto w-full max-w-5xl px-4 py-8">
+          <h1 className="text-3xl font-bold text-gray-900">Your Assignments</h1>
+          <p className="text-gray-600 mt-1">Assessments assigned to you by your organization.</p>
 
-            <div className="mt-20 w-full">
-                {!loading && !showJDT && !showSJT ? (
-                    <div className="text-center py-10 px-6 bg-gray-50 rounded-lg">
-                        <Info className="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 className="mt-2 text-xl font-medium text-gray-900">No Tests Assigned</h3>
-                        <p className="mt-1 text-base text-gray-500">
-                            No tests have been assigned to you at this time. Please contact your administrator to request test access.
-                        </p>
-                    </div>
-                ) : (
-                    <div className={`grid grid-cols-1 ${showJDT && showSJT ? 'md:grid-cols-2' : 'max-w-md mx-auto'} gap-8`}>
-                        {showSJT && (
-                            <AssessmentCard 
-                                title="SITUATIONAL JUDGEMENT"
-                                icon={<FileText />}
-                                decide="Read each situation. Decide what you would do in that situation."
-                                howItWorks="Each question is 1 situation with response choices. There is no right or wrong response, so choose a response based on what you would really do and not what sounds ideal."
-                                remember="Finish all questions in 1 attempt. If get logged out you will need to reattempt all questions again."
-                                questions={`${sjtQuestionCount.toString().padStart(2, '0')}${sjtHasFollowUps ? '+' : ''}`}
-                                attempts={`${sjtAttempts}/${sjtAvailability?.max_attempts ?? MAX_ATTEMPTS_FALLBACK}`}
-                                link="/sjt"
-                isDisabled={!sjtAvailability?.can_start}
-                                currentAttempts={sjtAttempts}
-                                maxAttempts={sjtAvailability?.max_attempts ?? MAX_ATTEMPTS_FALLBACK}
-                                hasReport={hasSjtReport}
-                                onViewReport={handleViewSjtReport}
-                notConfigured={sjtAvailability ? !sjtAvailability.configured : false}
-                inProgress={false /* could add flag if availability exposes it later */}
-                            />
-                        )}
-                        {showJDT && (
-                             <AssessmentCard 
-                                title="JOB DESCRIPTION TEST"
-                                icon={<Briefcase />}
-                                decide="Analyze the job description and respond to tailored questions."
-                                howItWorks="Start by understanding the role requirements. Then respond to questions designed to assess your fit and skills for that role."
-                                remember="Once you finish the analysis and start responding to questions, you need to finish all questions in 1 attempt."
-                                questions={jdtQuestionCount.toString().padStart(2, '0')}
-                                attempts={`${jdtAttempts}/${jdtAvailability?.max_attempts ?? MAX_ATTEMPTS_FALLBACK}`}
-                                link="/interview"
-                isDisabled={!jdtAvailability?.can_start}
-                                currentAttempts={jdtAttempts}
-                                maxAttempts={jdtAvailability?.max_attempts ?? MAX_ATTEMPTS_FALLBACK}
-                                hasReport={hasJdtReport}
-                                onViewReport={handleViewJdtReport}
-                notConfigured={jdtAvailability ? !jdtAvailability.configured : false}
-                inProgress={false}
-                            />
-                        )}
-                    </div>
-                )}
+          {loading ? (
+            <div className="mt-10 flex items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
             </div>
+          ) : !assignments || assignments.length === 0 ? (
+            <div className="mt-10 rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
+              <Info className="mx-auto h-10 w-10 text-gray-400" />
+              <h3 className="mt-3 text-lg font-medium text-gray-900">No assignments yet</h3>
+              <p className="mt-1 text-gray-600">Please check back later or contact your administrator.</p>
+            </div>
+          ) : (
+            <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+              {assignments.map((a) => (
+                <AssignedTestCard
+                  key={a.id}
+                  assignmentId={a.id}
+                  assignmentCode={a.code}
+                  name={a.name}
+                  testType={a.delivery_mode}
+                  languageCode={a.language_code}
+                  allowLanguageSwitch={a.metadata?.allow_language_switch}
+                  openAt={a.open_at || null}
+                  deadlineAt={a.deadline_at || null}
+                  canStart={true}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>
   );
-}
-
-export default function Home() {
-  const { isAuthenticated, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push('/login');
-    }
-  }, [loading, isAuthenticated, router]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  return <SelectionPage />;
 }

@@ -208,7 +208,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
       </div>
     );
   }
@@ -261,7 +261,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
           )}
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
           >
             <Plus className="h-4 w-4" />
             <span>Add User</span>
@@ -281,7 +281,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
 
@@ -289,7 +289,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
             <select
               value={filterRole}
               onChange={(e) => { setFilterRole(e.target.value); setPage(1); }}
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             >
               <option value="all">All Roles</option>
               <option value="superadmin">Super Admin</option>
@@ -301,7 +301,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
             <select
               value={filterActive === 'all' ? 'all' : filterActive.toString()}
               onChange={(e) => { setFilterActive(e.target.value === 'all' ? 'all' : e.target.value === 'true'); setPage(1); }}
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             >
               <option value="all">All Status</option>
               <option value="true">Active</option>
@@ -331,7 +331,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
                     type="checkbox"
                     checked={selectedUsers.size === filteredUsers.length && filteredUsers.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -362,7 +362,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
                       type="checkbox"
                       checked={selectedUsers.has(user.id)}
                       onChange={() => handleSelectUser(user.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -370,7 +370,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
                       <div className="flex-shrink-0 h-10 w-10">
                         <div className={`h-10 w-10 rounded-full flex items-center justify-center text-white font-medium ${
                           user.role === 'superadmin' ? 'bg-purple-600' :
-                          user.role === 'admin' ? 'bg-blue-600' : 'bg-green-600'
+                          user.role === 'admin' ? 'bg-orange-600' : 'bg-green-600'
                         }`}>
                           {user.candidate_name.charAt(0).toUpperCase()}
                         </div>
@@ -385,7 +385,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       user.role === 'superadmin' ? 'bg-purple-100 text-purple-800' :
-                      user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                      user.role === 'admin' ? 'bg-orange-100 text-orange-800' :
                       'bg-green-100 text-green-800'
                     }`}>
                       {user.role === 'superadmin' && <Shield className="h-3 w-3 mr-1" />}
@@ -435,7 +435,7 @@ export default function UserManagement({ onBack }: UserManagementProps) {
                           setSelectedUser(user);
                           setShowDetailsModal(true);
                         }}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                        className="text-orange-600 hover:text-orange-900 p-1 rounded"
                         title="View Details"
                       >
                         <Eye className="h-4 w-4" />
@@ -592,7 +592,7 @@ function CreateUserModal({ onClose, onSubmit }: {
                 required
                 value={formData.candidate_name}
                 onChange={(e) => setFormData({ ...formData, candidate_name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
             
@@ -605,7 +605,7 @@ function CreateUserModal({ onClose, onSubmit }: {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -620,7 +620,7 @@ function CreateUserModal({ onClose, onSubmit }: {
                 required
                 value={formData.candidate_id}
                 onChange={(e) => setFormData({ ...formData, candidate_id: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
             
@@ -634,7 +634,7 @@ function CreateUserModal({ onClose, onSubmit }: {
                 value={formData.client_name}
                 onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                 disabled={loadingCompanies || companies.length === 0}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
               >
                 {loadingCompanies && <option value="">Loading companies...</option>}
                 {!loadingCompanies && companies.length === 0 && <option value="">No companies available</option>}
@@ -654,7 +654,7 @@ function CreateUserModal({ onClose, onSubmit }: {
               <select
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="candidate">Candidate</option>
                 <option value="admin">Admin</option>
@@ -669,7 +669,7 @@ function CreateUserModal({ onClose, onSubmit }: {
               <select
                 value={formData.language_preference}
                 onChange={(e) => setFormData({ ...formData, language_preference: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
@@ -687,7 +687,7 @@ function CreateUserModal({ onClose, onSubmit }: {
               required
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               placeholder="Minimum 8 characters"
             />
           </div>
@@ -698,7 +698,7 @@ function CreateUserModal({ onClose, onSubmit }: {
               id="is_active"
               checked={formData.is_active}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
             />
             <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
               Active
@@ -715,7 +715,7 @@ function CreateUserModal({ onClose, onSubmit }: {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
             >
               Create User
             </button>
@@ -785,7 +785,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
                 required
                 value={formData.candidate_name}
                 onChange={(e) => setFormData({ ...formData, candidate_name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
             
@@ -798,7 +798,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -813,7 +813,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
                 required
                 value={formData.candidate_id}
                 onChange={(e) => setFormData({ ...formData, candidate_id: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
             
@@ -826,7 +826,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
                 value={formData.client_name}
                 onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                 disabled={loadingCompanies || companies.length === 0}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
               >
                 {loadingCompanies && <option value="">Loading companies...</option>}
                 {!loadingCompanies && companies.length === 0 && <option value="">No companies available</option>}
@@ -846,7 +846,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
               <select
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="candidate">Candidate</option>
                 <option value="admin">Admin</option>
@@ -861,7 +861,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
               <select
                 value={formData.language_preference}
                 onChange={(e) => setFormData({ ...formData, language_preference: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
@@ -876,7 +876,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
               id="is_active_edit"
               checked={formData.is_active}
               onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
             />
             <label htmlFor="is_active_edit" className="ml-2 text-sm text-gray-700">
               Active
@@ -893,7 +893,7 @@ function EditUserModal({ user, onClose, onSubmit }: {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
             >
               Update User
             </button>
@@ -920,7 +920,7 @@ function UserDetailsModal({ user, onClose }: {
           <div className="flex items-center space-x-4">
             <div className={`h-16 w-16 rounded-full flex items-center justify-center text-white font-bold text-xl ${
               user.role === 'superadmin' ? 'bg-purple-600' :
-              user.role === 'admin' ? 'bg-blue-600' : 'bg-green-600'
+              user.role === 'admin' ? 'bg-orange-600' : 'bg-green-600'
             }`}>
               {user.candidate_name.charAt(0).toUpperCase()}
             </div>
@@ -929,7 +929,7 @@ function UserDetailsModal({ user, onClose }: {
               <p className="text-gray-600">{user.email}</p>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${
                 user.role === 'superadmin' ? 'bg-purple-100 text-purple-800' :
-                user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                user.role === 'admin' ? 'bg-orange-100 text-orange-800' :
                 'bg-green-100 text-green-800'
               }`}>
                 {user.role.charAt(0).toUpperCase() + user.role.slice(1)}

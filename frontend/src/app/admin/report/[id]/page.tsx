@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ProtectedRoute, useAuth } from '@/contexts/auth-context';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import type { Submission } from '@/types';
 import ConversationSummary from '@/components/conversation-summary';
 import { Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
@@ -11,9 +11,12 @@ import Header from '@/components/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
+import type { AnalysisResult } from '@/types';
 
 const ReportDetailPage = () => {
     const { getSubmissionById } = useAuth();
+    const pathname = usePathname();
+    const basePath = pathname?.startsWith('/superadmin') ? '/superadmin' : '/admin';
     const router = useRouter();
     const params = useParams();
     const id = Array.isArray(params.id) ? params.id[0] : params.id as string;
@@ -43,21 +46,34 @@ const ReportDetailPage = () => {
         fetchSubmission();
     }, [id, getSubmissionById]);
 
-    // Check if submission needs AI analysis (basic analysis has limited content)
+    // Check if submission needs AI analysis
     const needsAiAnalysis = (submission: Submission) => {
+        // If no report/analysis_result at all, needs analysis
         if (!submission.report) return true;
+        
         const report = submission.report;
         
-        // Check if this looks like a basic analysis (contains "pending" or very short content)
-        const hasBasicAnalysis = (
-            report.weaknesses?.includes('pending') || 
-            report.strengths?.length < 100 ||
-            report.summary?.includes('Detailed analysis pending') ||
-            report.competencyAnalysis?.length === 1 && 
-            report.competencyAnalysis[0]?.competencies?.length === 1 &&
-            report.competencyAnalysis[0]?.competencies[0]?.name === 'Participation'
+        // Check if analysis_result is empty or null
+        if (!report || typeof report !== 'object') return true;
+        
+        // Check if it has meaningful analysis content
+        // A complete analysis should have competencyQualitativeSummary or competencyAnalysis
+        const hasCompetencyAnalysis = (
+            (report.competencyQualitativeSummary && report.competencyQualitativeSummary.length > 0) ||
+            (report.competencyAnalysis && report.competencyAnalysis.length > 0)
         );
         
+        // If no competency analysis, it's incomplete
+        if (!hasCompetencyAnalysis) return true;
+        
+        // Check if it looks like a placeholder/basic analysis
+        const hasBasicAnalysis = (
+            report.weaknesses?.includes('pending') || 
+            report.summary?.includes('Detailed analysis pending') ||
+            report.summary?.includes('Analysis completed')
+        );
+        
+        // Needs analysis if it's basic/placeholder content
         return hasBasicAnalysis;
     };
 
@@ -135,7 +151,7 @@ const ReportDetailPage = () => {
     };
 
     const handleBack = () => {
-        router.push('/admin/submissions');
+        router.push(`${basePath}/submissions`);
     };
 
     if (loading) {
@@ -166,7 +182,7 @@ const ReportDetailPage = () => {
             <Header />
             <main className="flex-grow flex flex-col items-center p-4 sm:p-6 lg:p-8">
                 <div className="w-full max-w-4xl mb-4">
-                     <Link href="/admin/submissions" passHref>
+                     <Link href={`${basePath}/submissions`} passHref>
                         <Button variant="outline">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to All Submissions
@@ -275,7 +291,7 @@ const ReportDetailPage = () => {
                 )}
                 
                 <ConversationSummary
-                    analysisResult={submission.report}
+                    analysisResult={submission.report as any}
                     history={submission.history}
                     onReattempt={handleBack}
                     reattemptText="Back to Submissions"

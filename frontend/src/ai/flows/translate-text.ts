@@ -6,7 +6,7 @@
  * - translateText - A function that translates a given text string.
  */
 
-import { ai } from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const TranslateTextInputSchema = z.object({
@@ -61,6 +61,7 @@ export async function translateToEnglish(input: TranslateToEnglishInput): Promis
   return translateToEnglishFlow(input);
 }
 
+const ai = getAI();
 const prompt = ai.definePrompt({
   name: 'translateTextPrompt',
   input: { schema: TranslateTextInputSchema },

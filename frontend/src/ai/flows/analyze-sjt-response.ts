@@ -9,7 +9,7 @@
  * - AnalyzeSJTResponseOutput - The return type for the analyzeSJTResponse function.
  */
 
-import { ai } from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
 import { translateToEnglish, type TranslateToEnglishOutput } from './translate-text';
 
@@ -62,6 +62,7 @@ export async function analyzeSingleCompetency(input: {
   });
 }
 
+const ai = getAI();
 const prompt = ai.definePrompt({
   name: 'analyzeSJTResponsePrompt',
   input: { schema: AnalyzeSJTResponseInputSchema },

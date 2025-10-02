@@ -8,7 +8,7 @@
  * - GenerateInterviewQuestionsOutput - The return type for the function.
  */
 
-import {ai} from '@/ai/genkit';
+import { getAI } from '@/ai/genkit';
 import {z} from 'genkit';
 import { translationService } from '@/lib/translation-service';
 
@@ -35,6 +35,7 @@ export async function generateInterviewQuestions(input: GenerateInterviewQuestio
   return generateInterviewQuestionsFlow(input);
 }
 
+const ai = getAI();
 const prompt = ai.definePrompt({
   name: 'generateInterviewQuestionsPrompt',
   input: {schema: GenerateInterviewQuestionsInputSchema},

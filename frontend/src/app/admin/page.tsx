@@ -1,390 +1,312 @@
-
 'use client';
 
-import React, { ReactNode, useState, useEffect } from 'react';
-import { useAuth, ProtectedRoute } from '@/contexts/auth-context';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { FileText, Briefcase, LogOut, FileSearch, Users, BadgeCheck, Settings, MessageSquare, Mic, Type, Video, Eye, EyeOff, Languages, PlusCircle, Trash2, Target } from 'lucide-react';
-import Link from 'next/link';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+  ArrowRight,
+  DownloadCloud,
+  LineChart,
+  Loader2,
+  Sparkles,
+  UploadCloud,
+  Users,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { apiService } from '@/lib/api-service';
 import Header from '@/components/header';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import type { InterviewMode } from '@/types';
-import { useToast } from '@/hooks/use-toast';
-import { Switch } from '@/components/ui/switch';
+import StatusEventsPanel from '@/components/status/StatusEventsPanel';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { configurationService } from '@/lib/config-service';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TestAssignmentManagement from '@/components/admin/TestAssignmentManagement';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
-interface GlobalSettings {
-    replyMode: InterviewMode;
-    showReport: boolean;
-    isJdtEnabled: boolean;
-    isSjtEnabled: boolean;
-    languages: string[];
+interface SubmissionRow {
+  id: string;
+  candidateName: string;
+  candidateEmail?: string;
+  testType?: string;
+  status?: string;
+  analysisStatus?: string;
+  createdAt?: string;
+  completedAt?: string;
+  language?: string;
 }
 
-const AdminDashboard = () => {
-    const { logout, isSuperAdmin } = useAuth();
-    const { toast } = useToast();
-    const [settings, setSettings] = useState<GlobalSettings>({
-        replyMode: 'video',
-        showReport: true,
-        isJdtEnabled: true,
-        isSjtEnabled: true,
-        languages: ['English'],
-    });
+const NBSP = '\u00a0';
 
-    useEffect(() => {
-        const loadSettings = async () => {
-            try {
-                console.log('🔧 Loading global settings from database...');
-                const savedSettings = await configurationService.getGlobalSettings();
-                if (savedSettings) {
-                    setSettings(prev => ({ 
-                        ...prev, 
-                        ...savedSettings,
-                        languages: savedSettings.languages && savedSettings.languages.length > 0 ? savedSettings.languages : ['English'],
-                    }));
-                }
-                console.log('✅ Global settings loaded from database');
-            } catch (error) {
-                console.error('❌ Error loading global settings from database:', error);
-            }
-        };
+function mapSubmission(raw: any): SubmissionRow {
+  return {
+    id: raw.id,
+    candidateName: raw.candidate_name ?? raw.candidateName ?? 'Unknown candidate',
+    candidateEmail: raw.email ?? raw.candidate_email ?? undefined,
+    testType: raw.test_type ?? raw.testType ?? undefined,
+    status: raw.status ?? raw.progress_status ?? undefined,
+    analysisStatus: raw.analysis_status ?? raw.analysisStatus ?? undefined,
+    createdAt: raw.created_at ?? raw.createdAt ?? undefined,
+    completedAt: raw.analysis_completed_at ?? raw.completed_at ?? undefined,
+    language: raw.ui_language ?? raw.candidate_language ?? undefined,
+  };
+}
 
-        loadSettings();
-    }, []);
+export default function AdminDashboard() {
+  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const tenantScoped = !isSuperAdmin && user?.tenant_id && user.tenant_id !== '00000000-0000-0000-0000-000000000001' ? user.tenant_id : undefined;
+  const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
+  const [loadingSubs, setLoadingSubs] = useState(true);
+  const [subsError, setSubsError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<string | null>(null);
+  const [tenantOverride, setTenantOverride] = useState('');
 
-    const handleSaveSettings = async () => {
-        try {
-            // Save global settings first
-            const success = await configurationService.saveGlobalSettings(settings);
-            if (!success) {
-                throw new Error('Failed to save settings');
-            }
-            
-            // Initialize translation catalogs for any new languages
-            const initPromises = settings.languages.map(async (languageName) => {
-                if (languageName === 'English') return; // Skip English
-                
-                try {
-                    // Detect language code from name (basic mapping)
-                    const detectLanguageCode = (name: string): string => {
-                        const lowerName = name.toLowerCase();
-                        const nameToCode: Record<string, string> = {
-                            'spanish': 'es', 'español': 'es',
-                            'french': 'fr', 'français': 'fr',
-                            'german': 'de', 'deutsch': 'de',
-                            'arabic': 'ar', 'العربية': 'ar',
-                            'chinese': 'zh', '中文': 'zh',
-                            'japanese': 'ja', '日本語': 'ja',
-                            'korean': 'ko', '한국어': 'ko',
-                            'portuguese': 'pt', 'português': 'pt',
-                            'russian': 'ru', 'русский': 'ru',
-                            'italian': 'it', 'italiano': 'it',
-                            'dutch': 'nl', 'nederlands': 'nl',
-                            'hindi': 'hi', 'हिन्दी': 'hi',
-                            'urdu': 'ur', 'اردو': 'ur'
-                        };
-                        return nameToCode[lowerName] || 'auto';
-                    };
-                    
-                    const languageCode = detectLanguageCode(languageName);
-                    
-                    // Call catalog initialization API
-                    const response = await fetch('/api/i18n/init', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            language: languageName,
-                            languageCode: languageCode
-                        }),
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        console.log(`✅ Initialized catalog for ${languageName}:`, result);
-                    } else {
-                        console.warn(`⚠️ Failed to initialize catalog for ${languageName}`);
-                    }
-                } catch (error) {
-                    console.warn(`⚠️ Error initializing catalog for ${languageName}:`, error);
-                }
-            });
-            
-            // Wait for all catalog initializations (but don't fail if some fail)
-            await Promise.allSettled(initPromises);
-            
-            toast({
-                title: 'Settings Saved',
-                description: 'Global settings have been updated and translation catalogs initialized.',
-            });
-        } catch (error) {
-            console.error('Error saving global settings:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Save Failed',
-                description: 'Failed to save global settings to the database. Please try again.',
-            });
-        }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingSubs(true);
+      setSubsError(null);
+      const res = await apiService.getSubmissions(tenantScoped ? { tenant_id: tenantScoped } : undefined);
+      if (cancelled) return;
+      if (res.error) {
+        setSubsError(res.error);
+        setSubmissions([]);
+      } else {
+        setSubmissions(Array.isArray(res.data) ? res.data.map(mapSubmission) : []);
+      }
+      setLoadingSubs(false);
+    })();
+    return () => {
+      cancelled = true;
     };
-    
-    const handleLanguageChange = (index: number, value: string) => {
-        const newLanguages = [...settings.languages];
-        newLanguages[index] = value;
-        setSettings(s => ({ ...s, languages: newLanguages.filter(l => l.trim() !== '') }));
-      };
-    
-      const addLanguage = () => {
-        setSettings(s => ({ ...s, languages: [...s.languages, ''] }));
-      };
-      
-      const removeLanguage = (index: number) => {
-        if(settings.languages.length <= 1) return;
-        const newLanguages = settings.languages.filter((_, i) => i !== index);
-        setSettings(s => ({ ...s, languages: newLanguages }));
-      };
+  }, [tenantScoped]);
 
+  const metrics = useMemo(() => {
+    const total = submissions.length;
+    const completed = submissions.filter((row) => (row.analysisStatus ?? '').includes('completed')).length;
+    const inProgress = submissions.filter((row) => (row.status ?? '').toLowerCase().includes('started')).length;
+    const waitingAnalysis = submissions.filter((row) => !row.analysisStatus || row.analysisStatus === 'pending').length;
+    return {
+      total,
+      completed,
+      inProgress,
+      waitingAnalysis,
+    };
+  }, [submissions]);
 
-    return (
-      <>
-        <Header />
-        <div className="container mx-auto px-4 sm:px-8 py-8">
-            <header className="mb-8 flex justify-between items-center">
-                <div>
-                    <h1 className="text-4xl font-headline text-gray-800">Admin Dashboard</h1>
-                    <p className="text-muted-foreground">Configure interview types and manage the platform.</p>
-                </div>
-                <Button onClick={logout} variant="outline">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Admin Logout
-                </Button>
-            </header>
+  const uniqueCandidates = useMemo(() => new Set(submissions.map((row) => row.candidateEmail || row.candidateName)).size, [submissions]);
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {/* Hide Global Settings card for admins; keep visible for superadmin when visiting admin area */}
-                {isSuperAdmin && (
-                <Card className="md:col-span-2 lg:col-span-3 bg-card/60 backdrop-blur-xl">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Settings /> Global Settings</CardTitle>
-                        <CardDescription>These settings apply to all assessments unless overridden.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                         <div className="space-y-6">
-                            <div>
-                                <Label className="flex items-center gap-2 mb-2"><MessageSquare /> Reply Mode</Label>
-                                <RadioGroup
-                                    value={settings.replyMode}
-                                    onValueChange={(value: InterviewMode) => setSettings(s => ({...s, replyMode: value}))}
-                                    className="flex flex-col gap-2 pt-2"
-                                >
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="video" id="video" />
-                                        <Label htmlFor="video" className="flex items-center gap-2"><Video/> Video + Audio</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="audio" id="audio" />
-                                        <Label htmlFor="audio" className="flex items-center gap-2"><Mic/> Audio Only</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="text" id="text" />
-                                        <Label htmlFor="text" className="flex items-center gap-2"><Type/> Text Only</Label>
-                                    </div>
-                                </RadioGroup>
-                                 <p className="text-xs text-muted-foreground mt-2">Choose how candidates will submit answers for all tests.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="flex items-center gap-2">Report Visibility</Label>
-                                <div className="flex items-center space-x-2 pt-2">
-                                    <Switch
-                                        id="show-report-switch"
-                                        checked={settings.showReport}
-                                        onCheckedChange={(checked) => setSettings(s => ({ ...s, showReport: checked }))}
-                                    />
-                                    <Label htmlFor="show-report-switch" className="flex items-center gap-2">
-                                        {settings.showReport ? <Eye className="h-4 w-4"/> : <EyeOff className="h-4 w-4"/>}
-                                        Show Report to Candidate
-                                    </Label>
-                                </div>
-                                 <p className="text-xs text-muted-foreground mt-2">If off, candidate sees a thank you message instead of results.</p>
-                            </div>
-                         </div>
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadResult(null);
+    const response = await apiService.importUsersCSV(file, isSuperAdmin ? { tenant_id: tenantOverride || undefined } : undefined);
+    if (response.error) {
+      setUploadResult(response.error);
+    } else {
+      setUploadResult(`Imported ${response.data?.created ?? 0} users. Skipped ${response.data?.skipped ?? 0}.`);
+    }
+    setUploading(false);
+    event.target.value = '';
+  };
 
-                         <div className="space-y-6">
-                            <div className="space-y-2">
-                                 <Label className="flex items-center gap-2"><Languages /> Available Languages</Label>
-                                 <div className="space-y-2">
-                                    {settings.languages.map((lang, index) => (
-                                        <div key={index} className="flex items-center gap-2">
-                                            <Input
-                                                value={lang}
-                                                onChange={(e) => handleLanguageChange(index, e.target.value)}
-                                                placeholder="e.g., English"
-                                            />
-                                            {settings.languages.length > 1 && (
-                                                <Button variant="ghost" size="icon" onClick={() => removeLanguage(index)} type="button">
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    ))}
-                                 </div>
-                                <Button variant="outline" size="sm" onClick={addLanguage} type="button">
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Language
-                                </Button>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="flex items-center gap-2">Enabled Assessments</Label>
-                                <div className="flex flex-col gap-2 pt-2">
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="enable-jdt-switch"
-                                            checked={settings.isJdtEnabled}
-                                            onCheckedChange={(checked) => setSettings(s => ({ ...s, isJdtEnabled: checked }))}
-                                        />
-                                        <Label htmlFor="enable-jdt-switch" className="flex items-center gap-2">
-                                            <Briefcase className="h-4 w-4"/> Enable JDT
-                                        </Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="enable-sjt-switch"
-                                            checked={settings.isSjtEnabled}
-                                            onCheckedChange={(checked) => setSettings(s => ({ ...s, isSjtEnabled: checked }))}
-                                        />
-                                        <Label htmlFor="enable-sjt-switch" className="flex items-center gap-2">
-                                            <FileText className="h-4 w-4"/> Enable SJT
-                                        </Label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+  // Removed automatic redirect from /admin to /admin/user-updates
 
-                    </CardContent>
-                    <CardFooter>
-                        <Button onClick={handleSaveSettings}>Save Global Settings</Button>
-                    </CardFooter>
-                </Card>
-                )}
-
-                {/* Hide config links for admins as per new governance. Keep code but don't render. */}
-                {isSuperAdmin && (
-                  <>
-                    <Link href="/admin/sjt" className="block hover:no-underline">
-                        <AdminConfigCard
-                            icon={<FileText className="h-8 w-8 text-primary" />}
-                            title="Situational Judgement Test"
-                            description="Configure situations with best/worst answers and assign competencies."
-                        />
-                    </Link>
-                    <Link href="/admin/jd" className="block hover:no-underline">
-                        <AdminConfigCard
-                            icon={<Briefcase className="h-8 w-8 text-primary" />}
-                            title="Job Description Based"
-                            description="Paste a Job Description to generate relevant questions and assess skills."
-                        />
-                    </Link>
-                  </>
-                )}
-                 <Link href="/admin/submissions" className="block hover:no-underline">
-                    <AdminConfigCard
-                        icon={<FileSearch className="h-8 w-8 text-primary" />}
-                        title="View Submissions"
-                        description="Review and analyze completed candidate interview reports."
-                    />
-                </Link>
-                 <Link href="/admin/users" className="block hover:no-underline">
-                    <AdminConfigCard
-                        icon={<Users className="h-8 w-8 text-primary" />}
-                        title="User Management"
-                        description="Add, view, and manage candidate and admin user accounts."
-                    />
-                </Link>
-                 <TestAssignmentCard />
-                 <Link href="/admin/verdict" className="block hover:no-underline col-span-1 md:col-span-2 lg:col-span-1">
-                    <AdminConfigCard
-                        icon={<BadgeCheck className="h-8 w-8 text-primary" />}
-                        title="Final Verdict"
-                        description="Synthesize JDT and SJT results for a final hiring recommendation."
-                    />
-                </Link>
-            </div>
-        </div>
-      </>
-    );
-};
-
-const TestAssignmentCard = () => {
-    const [showModal, setShowModal] = useState(false);
-
-    return (
-        <>
-            <Card 
-                className="bg-card border-border hover:border-primary/50 transition-colors h-full flex flex-col hover:shadow-lg"
-            >
-                <CardHeader className="flex-grow">
-                    <div className="mb-4">
-                        <Target className="h-8 w-8 text-primary" />
-                    </div>
-                    <CardTitle>Test Assignments</CardTitle>
-                    <CardDescription>Assign tests to your users and manage test access.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button className="w-full" variant="outline" onClick={() => setShowModal(true)}>
-                        Configure / View
-                    </Button>
-                </CardContent>
-            </Card>
-            
-            {showModal && (
-                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-background border rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
-                        <div className="p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-2xl font-bold">Test Assignment Management</h2>
-                                <Button variant="ghost" onClick={() => setShowModal(false)}>×</Button>
-                            </div>
-                            <TestAssignmentManagement />
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
-
-interface AdminConfigCardProps {
-    icon: ReactNode;
-    title: string;
-    description: string;
-}
-
-const AdminConfigCard = ({ icon, title, description }: AdminConfigCardProps) => (
-    <Card className="bg-card border-border hover:border-primary/50 transition-colors h-full flex flex-col hover:shadow-lg">
-        <CardHeader className="flex-grow">
-            <div className="mb-4">{icon}</div>
-            <CardTitle>{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-             <Button className="w-full" variant="outline">
-                Configure / View
-            </Button>
-        </CardContent>
-    </Card>
-);
-
-
-const AdminPage = () => {
   return (
-    <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-      <AdminDashboard />
-    </ProtectedRoute>
-  );
-};
+    <div className="flex min-h-screen flex-col bg-white text-slate-900">
+      <Header />
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-6 py-10">
+        <section className="relative overflow-hidden rounded-3xl border border-orange-200 bg-white p-10 shadow">
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+            className="relative z-10 grid gap-6 md:grid-cols-[1.35fr,1fr] md:items-center"
+          >
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-orange-700">
+                <Sparkles className="h-4 w-4 text-orange-700" /> Real-time hiring operations
+              </span>
+              <h1 className="mt-6 text-pretty text-4xl font-semibold leading-tight md:text-5xl text-slate-900">
+                {user?.client_name ? `${user.client_name} hiring cockpit` : 'Admin control room'}
+              </h1>
+              <p className="mt-4 max-w-2xl text-lg text-slate-600">
+                Monitor live assessments, download AI-backed reports, and keep your candidate pipeline flowing without ever leaving this dashboard.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-slate-700">
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700">
+                  <LineChart className="mr-1 h-3 w-3 text-orange-700" /> Live analytics
+                </Badge>
+                <Badge variant="secondary" className="bg-orange-50 text-orange-700">
+                  <Users className="mr-1 h-3 w-3 text-orange-700" /> Candidate-first
+                </Badge>
+              </div>
+            </div>
+            <Card className="border-orange-200 bg-white">
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-500">Snapshot</CardTitle>
+                <CardDescription className="text-slate-500">
+                  Auto-refreshing view of your interview funnel.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 text-sm text-slate-700">
+                <div className="flex items-center justify-between rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
+                  <span className="text-slate-700">Total submissions</span>
+                  <span className="text-lg font-semibold text-slate-900">{metrics.total}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
+                  <span className="text-slate-700">Active candidates</span>
+                  <span className="text-lg font-semibold text-slate-900">{uniqueCandidates}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
+                  <span className="text-slate-700">Waiting for AI analysis</span>
+                  <span className="text-lg font-semibold text-slate-900">{metrics.waitingAnalysis}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </section>
 
-export default AdminPage;
+        <section>
+          <Tabs defaultValue="submissions" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-4">
+              <TabsTrigger value="submissions">Submissions</TabsTrigger>
+              <TabsTrigger value="live">Live Feed</TabsTrigger>
+              <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
+              {isSuperAdmin && <TabsTrigger value="assignments">Assignments</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="submissions" className="mt-6">
+              <Card className="border-orange-200 bg-white">
+                <CardHeader className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl text-slate-900">Candidate submissions</CardTitle>
+                    <CardDescription className="text-slate-600">
+                      Export ready-to-share reports or jump into detailed transcripts.
+                    </CardDescription>
+                  </div>
+                  <Button className="bg-orange-600 text-white hover:bg-orange-700" onClick={() => window.open('/api/v1/submissions/export', '_blank')}>
+                    <DownloadCloud className="mr-2 h-4 w-4" /> Export CSV
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {loadingSubs ? (
+                    <div className="flex items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-slate-700">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading submissions…
+                    </div>
+                  ) : subsError ? (
+                    <div className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{subsError}</div>
+                  ) : (
+                    <Table className="text-slate-800">
+                      <TableHeader>
+                        <TableRow className="border-slate-200">
+                          <TableHead className="text-slate-600">Candidate</TableHead>
+                          <TableHead className="text-slate-600">Assessment</TableHead>
+                          <TableHead className="text-slate-600">Status</TableHead>
+                          <TableHead className="text-slate-600">AI analysis</TableHead>
+                          <TableHead className="text-slate-600">Created</TableHead>
+                          <TableHead className="text-slate-600">Language</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {submissions.slice(0, 12).map((row) => (
+                          <TableRow key={row.id} className="border-slate-200">
+                            <TableCell className="font-medium text-slate-900">{row.candidateName}</TableCell>
+                            <TableCell>{row.testType ?? 'Structured assessment'}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="border-slate-300 text-slate-700">
+                                {(row.status ?? 'pending').replace(/_/g, ' ')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`px-3 py-1 text-xs ${row.analysisStatus?.includes('completed') ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' : 'bg-amber-50 text-amber-700 border border-amber-300'}`}>
+                                {row.analysisStatus ?? 'pending'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</TableCell>
+                            <TableCell>{row.language?.toUpperCase?.() ?? 'EN'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      <TableCaption className="text-slate-500">
+                        Showing latest {Math.min(submissions.length, 12)} submissions.{' '}
+                        <Button variant="link" className="text-orange-600" onClick={() => window.open('/admin/submissions', '_blank')}>
+                          View full history
+                        </Button>
+                      </TableCaption>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="live" className="mt-6">
+              <StatusEventsPanel title="Live status feed" limit={50} />
+            </TabsContent>
+
+            <TabsContent value="bulk" className="mt-6">
+              <Card className="border-orange-200 bg-white">
+                <CardHeader>
+                  <CardTitle className="text-slate-900">Bulk candidate upload</CardTitle>
+                  <CardDescription className="text-slate-600">
+                    Drop a CSV to create candidate accounts in seconds. We{NBSP}skip duplicates automatically.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isSuperAdmin && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Tenant ID</label>
+                      <Input
+                        value={tenantOverride}
+                        onChange={(event) => setTenantOverride(event.target.value)}
+                        placeholder="Required for superadmin uploads"
+                        className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+                      />
+                    </div>
+                  )}
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-orange-300 bg-orange-50 px-5 py-4 text-sm text-slate-700 hover:border-orange-400">
+                    <div className="flex items-center gap-3">
+                      <UploadCloud className="h-5 w-5 text-orange-700" />
+                      <div>
+                        <p className="font-medium text-slate-900">Upload candidate CSV</p>
+                        <p className="text-xs text-slate-600">Headers: email, password, candidate_name, candidate_id, client_name, role</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4" />
+                    <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={uploading || (isSuperAdmin && !tenantOverride)} />
+                  </label>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                    <Button variant="link" className="p-0 text-orange-600" onClick={() => window.open('/templates/candidate-upload.csv', '_blank')}>
+                      Download template
+                    </Button>
+                    {uploading && (
+                      <span className="flex items-center gap-2 text-amber-700">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Uploading…
+                      </span>
+                    )}
+                    {uploadResult && <span className="text-emerald-700">{uploadResult}</span>}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {isSuperAdmin && (
+              <TabsContent value="assignments" className="mt-6">
+                <TestAssignmentManagement />
+              </TabsContent>
+            )}
+          </Tabs>
+        </section>
+      </main>
+    </div>
+  );
+}
