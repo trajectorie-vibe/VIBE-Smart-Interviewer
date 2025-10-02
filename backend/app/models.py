@@ -7,7 +7,9 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy import (
     Column, String, Integer, Boolean, DateTime, Text,
+    Column, String, Integer, Boolean, DateTime, Text,
     ForeignKey, CheckConstraint, UniqueConstraint, JSON,
+    DECIMAL, BIGINT, Index
     DECIMAL, BIGINT, Index
 )
 from sqlalchemy.ext.declarative import declarative_base
@@ -55,10 +57,16 @@ class User(Base, TimestampMixin):
     password_hash = Column(String(255), nullable=False)
     phone_number = Column(String(30))
     user_code = Column(String(50), unique=True)  # e.g., C1, C2 ... human-friendly code
+    phone_number = Column(String(30))
+    user_code = Column(String(50), unique=True)  # e.g., C1, C2 ... human-friendly code
     candidate_name = Column(String(255), nullable=False)
     candidate_id = Column(String(100), nullable=False)
     client_name = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False)
+    
+    # Demographics (optional)
+    age = Column(Integer)
+    gender = Column(String(50))
     
     # Demographics (optional)
     age = Column(Integer)
@@ -90,11 +98,13 @@ class User(Base, TimestampMixin):
 
 class Submission(Base, TimestampMixin):
     """Test submission and analysis results with enhanced tracking"""
+    """Test submission and analysis results with enhanced tracking"""
     __tablename__ = 'submissions'
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'))
     tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='CASCADE'))
+    test_id = Column(String(36), ForeignKey('tests.id', ondelete='SET NULL'))  # link to structured Test when available
     test_id = Column(String(36), ForeignKey('tests.id', ondelete='SET NULL'))  # link to structured Test when available
     
     # Basic submission info
@@ -106,8 +116,17 @@ class Submission(Base, TimestampMixin):
     ui_language = Column(String(10), default='en')
     
     # Test data with enhanced structure
+    # Test data with enhanced structure
     conversation_history = Column(JSON, nullable=False)
     analysis_result = Column(JSON)
+    
+    # Enhanced tracking
+    total_questions = Column(Integer, default=0)
+    base_questions = Column(Integer, default=0)  # Number of original scenario questions
+    follow_up_questions = Column(Integer, default=0)  # Number of AI-generated follow-ups
+    
+    # Configuration snapshot (store the config used for this test)
+    test_configuration = Column(JSON)  # Store SJT/JDT config used
     
     # Enhanced tracking
     total_questions = Column(Integer, default=0)
@@ -134,8 +153,11 @@ class Submission(Base, TimestampMixin):
     media_files = relationship("MediaFile", back_populates="submission", cascade="all, delete-orphan")
     # Optional link to structured test
     # relationship defined after Test model declaration
+    # Optional link to structured test
+    # relationship defined after Test model declaration
 
 class MediaFile(Base, TimestampMixin):
+    """Video/Audio file management with enhanced organization"""
     """Video/Audio file management with enhanced organization"""
     __tablename__ = 'media_files'
     
@@ -150,11 +172,23 @@ class MediaFile(Base, TimestampMixin):
     file_size = Column(BIGINT)
     
     # Enhanced question and scenario association
+    # Enhanced question and scenario association
     question_index = Column(Integer, nullable=False)
     scenario_id = Column(String(100))  # Maps to SJT scenario ID
     is_follow_up = Column(Boolean, default=False)
     follow_up_sequence = Column(Integer, default=0)  # 0 for base question, 1+ for follow-ups
+    scenario_id = Column(String(100))  # Maps to SJT scenario ID
+    is_follow_up = Column(Boolean, default=False)
+    follow_up_sequence = Column(Integer, default=0)  # 0 for base question, 1+ for follow-ups
     
+    # Storage details with Firebase support
+    storage_provider = Column(String(50), default='firebase')
+    storage_url = Column(Text)  # Firebase Storage URL
+    firebase_path = Column(Text)  # Path in Firebase Storage for organization
+    
+    # Processing status
+    transcription_status = Column(String(50), default='pending')
+    transcription_text = Column(Text)
     # Storage details with Firebase support
     storage_provider = Column(String(50), default='firebase')
     storage_url = Column(Text)  # Firebase Storage URL
@@ -168,6 +202,7 @@ class MediaFile(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint("file_type IN ('video', 'audio')", name='check_file_type'),
         CheckConstraint("storage_provider IN ('local', 's3', 'firebase')", name='check_storage_provider'),
+        CheckConstraint("transcription_status IN ('pending', 'processing', 'completed', 'failed')", name='check_transcription_status'),
         CheckConstraint("transcription_status IN ('pending', 'processing', 'completed', 'failed')", name='check_transcription_status'),
     )
     
@@ -301,6 +336,98 @@ class UserSession(Base, TimestampMixin):
     
     # Relationships
     user = relationship("User", back_populates="user_sessions")
+
+class UserAssignment(Base, TimestampMixin):
+    """Assignment of users to admins by superadmin"""
+    __tablename__ = 'user_assignments'
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    admin_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='CASCADE'), nullable=False)
+    
+    # Assignment metadata
+    assigned_by = Column(String(36), ForeignKey('users.id'), nullable=False)  # superadmin who made assignment
+    is_active = Column(Boolean, default=True)
+    notes = Column(Text)
+    
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('user_id', 'admin_id', name='ux_user_admin_assignment'),
+    )
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id], backref="assigned_to_admin")
+    admin = relationship("User", foreign_keys=[admin_id], backref="assigned_users")
+    assigner = relationship("User", foreign_keys=[assigned_by])
+    tenant = relationship("Tenant")
+
+class TestAssignment(Base, TimestampMixin):
+    """Assignment of specific tests to users by admin"""
+    __tablename__ = 'test_assignments'
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    admin_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    tenant_id = Column(String(36), ForeignKey('tenants.id', ondelete='CASCADE'), nullable=False)
+    
+    # Test details
+    test_type = Column(String(10), nullable=False)  # 'SJT' or 'JDT' (legacy)
+    test_id = Column(String(36), ForeignKey('tests.id', ondelete='SET NULL'))  # new structured Test reference
+    due_date = Column(DateTime(timezone=True))
+    max_attempts = Column(Integer, default=3)
+    
+    # Status tracking
+    status = Column(String(20), default='assigned')  # assigned, started, completed, overdue
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    started_at = Column(DateTime(timezone=True))
+    completed_at = Column(DateTime(timezone=True))
+    
+    # Configuration overrides
+    custom_config = Column(JSON)  # Optional test-specific configuration
+    notes = Column(Text)
+    
+    # Constraints
+    __table_args__ = (
+        CheckConstraint("test_type IN ('JDT', 'SJT')", name='check_assignment_test_type'),
+        CheckConstraint("status IN ('assigned', 'started', 'completed', 'overdue', 'cancelled')", name='check_assignment_status'),
+        UniqueConstraint('user_id', 'test_type', name='ux_user_test_assignment'),  # One assignment per test type per user
+        Index('ix_test_assignments_user_test', 'user_id', 'test_type'),
+    )
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id], backref="test_assignments")
+    admin = relationship("User", foreign_keys=[admin_id])
+    tenant = relationship("Tenant")
+    # Optional link to structured Test
+    # relationship defined after Test model declaration
+
+class TestAttempt(Base, TimestampMixin):
+    """Discrete attempt of a test (SJT/JDT) by a user"""
+    __tablename__ = 'test_attempts'
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    test_type = Column(String(10), nullable=False)  # JDT or SJT
+    assignment_id = Column(String(36), ForeignKey('test_assignments.id', ondelete='SET NULL'))
+    attempt_number = Column(Integer, nullable=False, default=1)
+    status = Column(String(20), default='in_progress')  # in_progress, completed, cancelled
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True))
+    max_questions = Column(Integer)
+    questions_snapshot = Column(JSON)  # Immutable list of questions served to user
+    attempt_metadata = Column(JSON)  # roleCategory, config version, etc.
+
+    __table_args__ = (
+        CheckConstraint("test_type IN ('JDT','SJT')", name='check_attempt_test_type'),
+        CheckConstraint("status IN ('in_progress','completed','cancelled')", name='check_attempt_status'),
+        UniqueConstraint('user_id', 'test_type', 'attempt_number', name='ux_user_test_attempt_number'),
+        Index('ix_test_attempts_user_test_status', 'user_id', 'test_type', 'status'),
+        Index('ix_test_attempts_user_test_number', 'user_id', 'test_type', 'attempt_number'),
+    )
+
+    user = relationship("User")
+    assignment = relationship("TestAssignment")
 
 class UserAssignment(Base, TimestampMixin):
     """Assignment of users to admins by superadmin"""
@@ -528,6 +655,9 @@ class UserBase(BaseModel):
     phone_number: Optional[str] = None
     age: Optional[int] = None
     gender: Optional[str] = None
+    phone_number: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=6)
@@ -539,9 +669,15 @@ class UserUpdate(BaseModel):
     candidate_id: Optional[str] = None
     client_name: Optional[str] = None
     role: Optional[str] = Field(None, pattern="^(superadmin|admin|candidate)$")
+    candidate_id: Optional[str] = None
+    client_name: Optional[str] = None
+    role: Optional[str] = Field(None, pattern="^(superadmin|admin|candidate)$")
     preferred_language: Optional[str] = None
     language_code: Optional[str] = None
     is_active: Optional[bool] = None
+    tenant_id: Optional[uuid.UUID] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
     tenant_id: Optional[uuid.UUID] = None
     age: Optional[int] = None
     gender: Optional[str] = None
@@ -553,6 +689,7 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: datetime
     tenant_id: Optional[uuid.UUID]
+    user_code: Optional[str]
     user_code: Optional[str]
     
     class Config:
@@ -841,6 +978,202 @@ class TestCompetencyOverridesResponse(BaseModel):
     test_id: uuid.UUID
     overrides: List[CompetencyOverrideItem]
 
+# Assignment Pydantic models
+class UserAssignmentBase(BaseModel):
+    user_id: uuid.UUID
+    admin_id: uuid.UUID
+    notes: Optional[str] = None
+
+class UserAssignmentCreate(UserAssignmentBase):
+    tenant_id: Optional[uuid.UUID] = None
+
+class UserAssignmentResponse(UserAssignmentBase):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    assigned_by: uuid.UUID
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class TestAssignmentBase(BaseModel):
+    user_id: uuid.UUID
+    test_type: str = Field(..., pattern="^(JDT|SJT)$")
+    test_id: Optional[uuid.UUID] = None
+    due_date: Optional[datetime] = None
+    max_attempts: int = 3
+    custom_config: Optional[Dict[str, Any]] = None
+    notes: Optional[str] = None
+
+class TestAssignmentCreate(TestAssignmentBase):
+    pass
+
+class TestAssignmentUpdate(BaseModel):
+    status: Optional[str] = Field(None, pattern="^(assigned|started|completed|overdue|cancelled)$")
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+class TestAssignmentResponse(TestAssignmentBase):
+    id: uuid.UUID
+    admin_id: uuid.UUID
+    tenant_id: uuid.UUID
+    status: str
+    assigned_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Test attempt Pydantic models
+class TestAttemptBase(BaseModel):
+    test_type: str = Field(..., pattern="^(JDT|SJT)$")
+    attempt_number: int
+    status: str
+    started_at: datetime
+    completed_at: Optional[datetime]
+    max_questions: Optional[int]
+
+class TestAttemptResponse(TestAttemptBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    assignment_id: Optional[uuid.UUID]
+    questions_snapshot: Optional[List[Any]]
+    attempt_metadata: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class StartAttemptRequest(BaseModel):
+    test_type: str = Field(..., pattern="^(JDT|SJT)$")
+    role_category: Optional[str] = None  # For JDT selection
+
+class StartAttemptResponse(BaseModel):
+    attempt: TestAttemptResponse
+    questions: List[Dict[str, Any]]
+    can_start: bool
+    remaining_attempts: int
+
+class TestAvailabilityResponse(BaseModel):
+    test_type: str
+    assigned: bool
+    configured: bool
+    attempts_used: int
+    max_attempts: int
+    can_start: bool
+    assignment_status: Optional[str]
+    assigned_question_count: Optional[int] = None
+
+# Bulk assignment requests
+class BulkUserAssignmentRequest(BaseModel):
+    user_ids: List[uuid.UUID]
+    admin_id: uuid.UUID
+    notes: Optional[str] = None
+
+class BulkTestAssignmentRequest(BaseModel):
+    # Accept user IDs as strings to be more permissive with client payloads;
+    # the API will validate existence/role via database lookups.
+    user_ids: List[str]
+    # Accept test_types case-insensitively and normalize server-side
+    test_types: List[str] = Field(..., description="List of test types to assign (JDT, SJT)")
+    test_id: Optional[str] = Field(None, description="Structured Test ID to assign (preferred)")
+    due_date: Optional[datetime] = None
+    max_attempts: int = 3
+    notes: Optional[str] = None
+    # Accept SJT scenario ids as strings or numbers from the client and coerce to strings server-side
+    sjt_scenario_ids: Optional[List[Any]] = Field(
+        None,
+        description="For SJT assignments, restrict to these scenario IDs (from tenant SJT config)."
+    )
+
+# Pydantic schemas for Questions and Tests
+class QuestionBase(BaseModel):
+    name: str
+    description: str
+    question_type: str = Field(..., pattern="^(SJT|JDT|CASE)$")
+    competencies: List[str]
+    content: Dict[str, Any]
+
+class QuestionCreate(QuestionBase):
+    add_to_bank: bool = True
+    scope: str = Field("system", pattern="^(system|tenant)$")
+    tenant_id: Optional[uuid.UUID] = None
+
+class QuestionResponse(QuestionBase):
+    id: uuid.UUID
+    question_code: str
+    scope: str
+    tenant_id: Optional[uuid.UUID]
+    created_at: datetime
+    updated_at: datetime
+    created_by: Optional[uuid.UUID]
+
+    class Config:
+        from_attributes = True
+
+class QuestionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    question_type: Optional[str] = Field(None, pattern="^(SJT|JDT|CASE)$")
+    competencies: Optional[List[str]] = None
+    content: Optional[Dict[str, Any]] = None
+
+class TestBase(BaseModel):
+    name: str
+    description: str
+    test_type: str = Field(..., pattern="^(SJT|JDT|CASE)$")
+    # Optional per-test configuration (timers, reply mode, camera check, etc.)
+    config: Optional[Dict[str, Any]] = None
+
+class TestCreate(TestBase):
+    scope: str = Field("system", pattern="^(system|tenant)$")
+    tenant_id: Optional[uuid.UUID] = None
+
+class TestResponse(TestBase):
+    id: uuid.UUID
+    test_code: str
+    scope: str
+    tenant_id: Optional[uuid.UUID]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    created_by: Optional[uuid.UUID]
+
+    class Config:
+        from_attributes = True
+
+class TestQuestionAddRequest(BaseModel):
+    question_ids: List[uuid.UUID]
+
+class TestQuestionResponse(BaseModel):
+    id: uuid.UUID
+    test_id: uuid.UUID
+    question_id: uuid.UUID
+    sort_order: int
+    settings: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+class CompetencyOverrideItem(BaseModel):
+    competency_code: str
+    competency_name: str
+    override_description: str
+
+class TestCompetencyOverridesRequest(BaseModel):
+    overrides: List[CompetencyOverrideItem]
+
+class TestCompetencyOverridesResponse(BaseModel):
+    test_id: uuid.UUID
+    overrides: List[CompetencyOverrideItem]
+
 # Competency Pydantic models
 class CompetencyBase(BaseModel):
     competency_code: str
@@ -874,6 +1207,28 @@ class CompetencyResponse(CompetencyBase):
     
     class Config:
         from_attributes = True
+
+# =====================================================
+# BULK USER GENERATION (SUPERADMIN)
+# =====================================================
+
+class GeneratedCredential(BaseModel):
+    user_id: uuid.UUID
+    email: EmailStr
+    password: str
+
+class BulkUserGenerateRequest(BaseModel):
+    count: int = Field(..., gt=0, le=1000)
+    email_prefix: str = Field(..., description="Prefix for email usernames e.g., CompanyA")
+    email_domain: str = Field("gmail.com", description="Email domain e.g., gmail.com")
+    name_prefix: Optional[str] = Field(None, description="Prefix for candidate_name, defaults to 'Candidate'")
+    start_from: int = Field(1, ge=1, description="Starting index for numbering")
+    use_fixed_password: bool = Field(False, description="If true, use fixed_password for all accounts")
+    fixed_password: Optional[str] = Field(None, description="Password to use when use_fixed_password=true")
+
+class BulkUserGenerateResponse(BaseModel):
+    created: int
+    credentials: List[GeneratedCredential]
 
 # =====================================================
 # BULK USER GENERATION (SUPERADMIN)
