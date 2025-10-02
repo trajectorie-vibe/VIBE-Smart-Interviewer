@@ -108,11 +108,35 @@ async def create_user(
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already in use")
+    
+    # Handle unique constraint for (candidate_id, client_name)
+    # For candidates: enforce uniqueness, reject duplicates
+    # For admins/superadmins: allow by making candidate_id unique if needed
+    candidate_id = payload.candidate_id
+    if payload.role in ('admin', 'superadmin'):
+        # Check if combination exists
+        conflict = db.query(User).filter(
+            User.candidate_id == candidate_id,
+            User.client_name == payload.client_name
+        ).first()
+        if conflict:
+            # Make candidate_id unique by appending user code or timestamp
+            import time
+            candidate_id = f"{candidate_id}_{int(time.time())}"
+    else:
+        # For candidates, enforce strict uniqueness
+        existing_candidate = db.query(User).filter(
+            User.candidate_id == candidate_id,
+            User.client_name == payload.client_name
+        ).first()
+        if existing_candidate:
+            raise HTTPException(status_code=400, detail=f"Candidate ID '{candidate_id}' already exists for client '{payload.client_name}'")
+    
     user = User(
         email=payload.email,
         password_hash=get_password_hash(payload.password),
         candidate_name=payload.candidate_name,
-        candidate_id=payload.candidate_id,
+        candidate_id=candidate_id,
         client_name=payload.client_name,
         role=payload.role,
         preferred_language=payload.preferred_language,

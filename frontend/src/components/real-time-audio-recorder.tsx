@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 interface RealTimeMediaCaptureProps {
   onRecordingComplete: (mediaBlob: Blob, mediaDataUri: string) => void;
   onRealtimeTranscription: (transcription: string) => void;
+  onFinalTranscription?: (transcription: string) => void; // NEW: Final transcription from audio
   isRecordingExternally: boolean;
   onStartRecording: () => void;
   onStopRecording: () => void;
@@ -32,6 +33,7 @@ declare global {
 const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
   onRecordingComplete,
   onRealtimeTranscription,
+  onFinalTranscription,
   isRecordingExternally,
   onStartRecording,
   onStopRecording,
@@ -52,6 +54,8 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
   const [currentTranscription, setCurrentTranscription] = useState('');
   const { currentLanguage } = useLanguage();
   const { t } = useTranslation();
+  const isRecordingRef = useRef(false);
+  const liveTranscriptRef = useRef(''); // Store live transcript for final comparison
 
   // Map BCP-47 codes to SpeechRecognition-preferred locale variants
   const getSpeechLocale = useCallback((langCode: string | undefined) => {
@@ -152,7 +156,10 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
   };
 
   const startSpeechRecognition = useCallback(() => {
-    if (!supportsSpeechRecognition) return;
+    if (!supportsSpeechRecognition) {
+      console.log('[Speech Recognition] Not supported in this browser - will use Gemini for transcription');
+      return;
+    }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
@@ -176,12 +183,16 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
       }
 
       const currentText = finalTranscript + interimTranscript;
+      console.log('[Speech Recognition] Live transcription update:', currentText);
       setCurrentTranscription(currentText);
+      liveTranscriptRef.current = currentText; // Store for final processing
       onRealtimeTranscription(currentText);
     };
 
     recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
+      console.warn('[Speech Recognition] Error (non-critical):', event.error);
+      
+      // Only show error for permission issues, ignore other errors
       if (event.error === 'not-allowed') {
         toast({
           variant: 'destructive',
@@ -189,15 +200,23 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
           description: t('recorder.micDeniedMsg'),
         });
       }
+      
+      // For aborted or other errors, just log and continue
+      // Gemini transcription will handle the final accurate transcription
+      if (event.error === 'aborted' || event.error === 'no-speech') {
+        console.log('[Speech Recognition] Ignoring non-critical error, will use Gemini for final transcription');
+      }
     };
 
     recognition.onend = () => {
-      // Auto-restart if still recording
-      if (isRecordingInternal) {
+      // Auto-restart if still recording (use ref to avoid stale closure)
+      if (isRecordingRef.current) {
         try {
+          console.log('[Speech Recognition] Session ended, attempting restart...');
           recognition.start();
         } catch (error) {
-          console.error('Error restarting speech recognition:', error);
+          console.warn('[Speech Recognition] Could not restart (non-critical):', error);
+          // This is not critical - Gemini will handle final transcription
         }
       }
     };
@@ -206,15 +225,15 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
     
     try {
       recognition.start();
+      console.log('[Speech Recognition] ✅ Started successfully with language:', getSpeechLocale(currentLanguage));
+      console.log('[Speech Recognition] Live transcription is optional - Gemini will provide final accurate transcription');
     } catch (error) {
-      console.error('Error starting speech recognition:', error);
-      toast({
-        variant: 'destructive',
-        title: t('recorder.srErrorTitle'),
-        description: t('recorder.srErrorMsg'),
-      });
+      console.warn('[Speech Recognition] ⚠️ Could not start (non-critical):', error);
+      console.log('[Speech Recognition] Proceeding without live transcription - Gemini will handle transcription after recording');
+      // Don't show error toast - this is not critical
+      // Gemini transcription will work regardless
     }
-  }, [supportsSpeechRecognition, isRecordingInternal, onRealtimeTranscription, toast, getSpeechLocale, currentLanguage]);
+  }, [supportsSpeechRecognition, onRealtimeTranscription, toast, getSpeechLocale, currentLanguage, t]);
 
   const stopSpeechRecognition = useCallback(() => {
     if (speechRecognitionRef.current) {
@@ -222,6 +241,77 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
       speechRecognitionRef.current = null;
     }
   }, []);
+
+  // NEW: Transcribe from audio blob using Gemini API after recording stops
+  const transcribeFromAudioBlob = useCallback(async (audioBlob: Blob) => {
+    if (!onFinalTranscription) {
+      console.log('[Final Transcription] Skipped - no callback provided');
+      return;
+    }
+
+    console.log('[Final Transcription] Starting Gemini API transcription from audio blob...');
+    console.log('[Final Transcription] Audio blob size:', audioBlob.size, 'bytes, type:', audioBlob.type);
+
+    try {
+      // Convert blob to data URI for Gemini API
+      const dataUri = await blobToDataURI(audioBlob);
+      console.log('[Final Transcription] Audio data URI created, length:', dataUri.length);
+      
+      // Send to Gemini transcription API
+      const response = await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audioDataUri: dataUri,
+          languageCode: currentLanguage,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini transcription failed: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      const geminiTranscript = result.transcription?.trim() || '';
+      
+      console.log('[Final Transcription] Gemini result received, length:', geminiTranscript.length);
+      console.log('[Final Transcription] Gemini transcript preview:', geminiTranscript.substring(0, 100) + '...');
+      
+      // Compare with live transcript
+      const liveText = liveTranscriptRef.current.trim();
+      console.log('[Final Transcription] Live transcript length:', liveText.length);
+      
+      // Use Gemini transcript as it's more accurate, fall back to live if Gemini is empty
+      const finalTranscript = geminiTranscript || liveText;
+      
+      if (finalTranscript) {
+        console.log('[Final Transcription] ✅ Using transcript from:', geminiTranscript ? 'Gemini API' : 'Live Speech Recognition');
+        onFinalTranscription(finalTranscript);
+      } else {
+        console.warn('[Final Transcription] ⚠️ Both Gemini and live transcripts are empty!');
+      }
+      
+    } catch (error) {
+      console.error('[Final Transcription] ❌ Gemini API error:', error);
+      
+      // Fall back to live transcript if Gemini fails
+      const liveText = liveTranscriptRef.current.trim();
+      if (liveText && onFinalTranscription) {
+        console.log('[Final Transcription] 🔄 Falling back to live transcript (length:', liveText.length, ')');
+        onFinalTranscription(liveText);
+      } else {
+        console.error('[Final Transcription] ❌ No fallback available - both Gemini and live transcript failed');
+        toast({
+          variant: 'destructive',
+          title: t('recorder.transcriptionFailedTitle') || 'Transcription Failed',
+          description: t('recorder.transcriptionFailedMsg') || 'Could not transcribe audio. Please try again.',
+        });
+      }
+    }
+  }, [onFinalTranscription, blobToDataURI, currentLanguage, toast, t]);
 
   const startRecording = async () => {
     if (!hasPermission || !stream) {
@@ -235,7 +325,11 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
     try {
       onStartRecording();
       setIsRecordingInternal(true);
+      isRecordingRef.current = true;
       setCurrentTranscription('');
+      liveTranscriptRef.current = ''; // Reset live transcript
+      
+      console.log('[Recording] Started - Live transcription active');
       
       // Start speech recognition for real-time transcription
       if (supportsSpeechRecognition) {
@@ -259,6 +353,13 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
 
       mediaRecorderRef.current.onstop = async () => {
         const completeBlob = new Blob(mediaChunksRef.current, { type: mimeType });
+        
+        console.log('[Recording] Stopped. Processing final transcription...');
+        
+        // Trigger final transcription from the audio blob
+        // This will use the live transcript as the final version (most reliable)
+        await transcribeFromAudioBlob(completeBlob);
+        
         try {
           const dataUri = await blobToDataURI(completeBlob);
           onRecordingComplete(completeBlob, dataUri);
@@ -285,7 +386,10 @@ const RealTimeMediaCapture: React.FC<RealTimeMediaCaptureProps> = ({
   };
 
   const stopRecording = () => {
+    console.log('[Recording] Stopping... Live transcript length:', liveTranscriptRef.current.length);
+    
     // Stop speech recognition
+    isRecordingRef.current = false;
     stopSpeechRecognition();
     
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {

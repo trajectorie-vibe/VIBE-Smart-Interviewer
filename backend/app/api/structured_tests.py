@@ -260,11 +260,14 @@ async def get_test_questions(
     return [
         {
             "id": str(q.id),
-            "question_text": q.question_text,
+            "question_code": q.question_code,
+            "name": q.name,
+            "description": q.description,
             "question_type": q.question_type,
-            "reading_time_seconds": tq.settings.get("reading_time_seconds") if tq.settings else None or 30,
-            "answer_time_seconds": tq.settings.get("answer_time_seconds") if tq.settings else None or 180,
-            "competency_code": q.competency_code,
+            "content": q.content,
+            "competencies": q.competencies,
+            "reading_time_seconds": tq.settings.get("reading_time_seconds") if tq.settings else 30,
+            "answer_time_seconds": tq.settings.get("answer_time_seconds") if tq.settings else 180,
             "sort_order": tq.sort_order
         }
         for tq, q in test_questions

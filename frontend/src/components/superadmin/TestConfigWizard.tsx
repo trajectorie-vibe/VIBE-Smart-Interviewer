@@ -74,6 +74,9 @@ export default function TestConfigWizard({ onOpenQuestionBank }: { onOpenQuestio
           apiService.listQuestions({ qtype: testType }),
           apiService.listCompetencies(),
         ]);
+        if (qRes.error) {
+          toast({ variant: 'destructive', title: 'Failed to load questions', description: qRes.error });
+        }
         setQuestions(qRes.data || []);
         const codes = (cRes.data || []).map((c: any) => c.competency_code).filter(Boolean);
         setCompetencyOptions(codes);
@@ -202,6 +205,10 @@ export default function TestConfigWizard({ onOpenQuestionBank }: { onOpenQuestio
           )}
           {step === 2 && (
             <div className="space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-900">
+                <strong>Select questions for this test:</strong> Use the checkboxes to select questions from the {testType} question bank below. 
+                {questions.length === 0 && <span className="text-orange-600 font-semibold"> No questions found - create one first!</span>}
+              </div>
               <div className="flex items-center gap-2">
                 <Label className="text-sm">Search questions</Label>
                 <Input value={qSearch} onChange={(e)=> setQSearch(e.target.value)} placeholder="Search question bank" />
@@ -265,7 +272,7 @@ export default function TestConfigWizard({ onOpenQuestionBank }: { onOpenQuestio
                 selected={selectedQ}
                 onToggleRow={toggleQ}
                 onToggleAllFiltered={toggleAllQ}
-                emptyText="No questions"
+                emptyText={`No ${testType} questions found in question bank. Create one using the button above.`}
               />
               <div className="flex gap-2">
                 <Button variant="secondary" onClick={()=> setStep(1)}>Back</Button>

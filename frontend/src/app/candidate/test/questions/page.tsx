@@ -217,14 +217,10 @@ function QuestionsClient() {
 			}
 
 			let testDetails: any = null;
-			const testRes = await apiService.getStructuredTest(testId);
-			if (!testRes.error && testRes.data) {
-				testDetails = testRes.data;
-			} else {
-				const listRes = await apiService.listStructuredTests();
-				if (!listRes.error && Array.isArray(listRes.data)) {
-					testDetails = listRes.data.find((t: any) => t.id === testId) ?? null;
-				}
+			// Try to get test details from the list endpoint since getStructuredTest(id) doesn't exist
+			const listRes = await apiService.listStructuredTests();
+			if (!listRes.error && Array.isArray(listRes.data)) {
+				testDetails = listRes.data.find((t: any) => t.id === testId) ?? null;
 			}
 
 			const mergedConfig = {
@@ -241,13 +237,68 @@ function QuestionsClient() {
 
 			const mapped: LoadedQuestion[] = questionsRes.data
 				.sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-				.map((q: any, index: number) => ({
-					id: String(q.id ?? q.question_id ?? index),
-					prompt: q.question_text ?? q.question ?? `Question ${index + 1}`,
-					readingTime: Number(q.reading_time_seconds) || DEFAULT_READING_SECONDS,
-					answerTime: Number(q.answer_time_seconds) || DEFAULT_ANSWER_SECONDS,
-					competency: q.competency_code ?? q.assessed_competency ?? null,
-				}));
+				.map((q: any, index: number) => {
+					// Debug: Log the question data to see what we're receiving
+					console.log('[Question Loading] Question', index + 1, ':', {
+						type: q.question_type,
+						content: q.content,
+						name: q.name,
+						description: q.description
+					});
+
+					// Extract the actual question text from content based on question type
+					let promptText = `Question ${index + 1}`;
+					if (q.content) {
+						if (q.question_type === 'SJT') {
+							// For SJT, show labeled sections: SCENARIO: and QUESTION:
+							// The correct field names are: scenarioDescription and question
+							const scenarioDesc = q.content.scenarioDescription || 
+											     q.content.scenario_description || 
+											     q.content.scenario || 
+											     q.content.scenarioName || // Sometimes just the name
+											     '';
+							const questionText = q.content.question || 
+											     q.content.prompt || 
+											     '';
+							
+							console.log('[SJT Parsing]', { 
+								scenarioDesc: scenarioDesc.substring(0, 50), 
+								questionText: questionText.substring(0, 50) 
+							});
+							
+							if (scenarioDesc && questionText) {
+								promptText = `SCENARIO:\n${scenarioDesc}\n\nQUESTION:\n${questionText}`;
+							} else if (scenarioDesc) {
+								promptText = `SCENARIO:\n${scenarioDesc}`;
+							} else if (questionText) {
+								promptText = `QUESTION:\n${questionText}`;
+							} else {
+								// Ultimate fallback: use the description field
+								promptText = `SCENARIO:\n${q.description}`;
+							}
+						} else if (q.question_type === 'JDT' && q.content.question) {
+							promptText = q.content.question;
+						} else if (q.question_type === 'CASE' && q.content.prompt) {
+							promptText = q.content.prompt;
+						} else if (q.content.question_text) {
+							promptText = q.content.question_text;
+						}
+					}
+					// Fallback to name or description if content doesn't have the prompt
+					if (promptText === `Question ${index + 1}`) {
+						promptText = q.name || q.description || q.question_text || q.question || promptText;
+					}
+					
+					console.log('[Question Loading] Final prompt:', promptText.substring(0, 100));
+					
+					return {
+						id: String(q.id ?? q.question_id ?? index),
+						prompt: promptText,
+						readingTime: Number(q.reading_time_seconds) || DEFAULT_READING_SECONDS,
+						answerTime: Number(q.answer_time_seconds) || DEFAULT_ANSWER_SECONDS,
+						competency: (Array.isArray(q.competencies) && q.competencies[0]) || q.competency_code || q.assessed_competency || null,
+					};
+				});
 
 			setQuestions(mapped);
 			clearAllTimers();
@@ -468,16 +519,30 @@ function QuestionsClient() {
 	const handleRealtimeTranscription = useCallback((value: string) => {
 		liveTranscriptRef.current = value;
 		setLiveTranscript(value);
+		console.log('[Questions Page] Live transcript updated:', value.substring(0, 100) + '...');
+	}, []);
+
+	const handleFinalTranscription = useCallback((value: string) => {
+		console.log('[Questions Page] Final transcription received:', value.substring(0, 100) + '...');
+		if (value.trim()) {
+			setFinalTranscript(value.trim());
+			// Update the ref as well to ensure it's saved
+			liveTranscriptRef.current = value.trim();
+		}
 	}, []);
 
 	const handleRecordingComplete = useCallback((blob: Blob, dataUri: string) => {
+		console.log('[Questions Page] Recording complete');
 		setCurrentRecording({ blob, dataUri });
+		// Final transcript will be set by handleFinalTranscription callback
+		// But ensure we have something from live transcript as fallback
 		const captured = liveTranscriptRef.current.trim();
-		if (captured) {
+		if (captured && !finalTranscript) {
+			console.log('[Questions Page] Using live transcript as fallback');
 			setFinalTranscript(captured);
 		}
 		setPhase("review");
-	}, []);
+	}, [finalTranscript]);
 
 	const handleRecorderStart = useCallback(() => {
 		if (currentQuestion) {
@@ -731,11 +796,6 @@ function QuestionsClient() {
 									</p>
 								))}
 							</div>
-							{currentQuestion.competency && (
-								<div className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-purple-700">
-									Competency: {currentQuestion.competency}
-								</div>
-							)}
 						</CardContent>
 					</Card>
 
@@ -788,19 +848,18 @@ function QuestionsClient() {
 									</div>
 								</div>
 
-								<RealTimeMediaCapture
-									onRecordingComplete={handleRecordingComplete}
-									onRealtimeTranscription={handleRealtimeTranscription}
-									isRecordingExternally={phase === "recording"}
-									onStartRecording={handleRecorderStart}
-									onStopRecording={handleRecorderStopped}
-									disabled={phase === "loading" || phase === "reading" || phase === "prep" || phase === "saving" || phase === "complete"}
-									captureMode={mode === "text" ? "video" : mode}
-									startTrigger={startTrigger}
-									stopTrigger={stopTrigger}
-								/>
-
-								<div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+							<RealTimeMediaCapture
+								onRecordingComplete={handleRecordingComplete}
+								onRealtimeTranscription={handleRealtimeTranscription}
+								onFinalTranscription={handleFinalTranscription}
+								isRecordingExternally={phase === "recording"}
+								onStartRecording={handleRecorderStart}
+								onStopRecording={handleRecorderStopped}
+								disabled={phase === "loading" || phase === "reading" || phase === "prep" || phase === "saving" || phase === "complete"}
+								captureMode={mode === "text" ? "video" : mode}
+								startTrigger={startTrigger}
+								stopTrigger={stopTrigger}
+							/>								<div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
 									<div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
 										<Video className="h-4 w-4 text-red-500" />
 										<span>{mode === "video" ? "Camera required" : "Camera optional"}</span>

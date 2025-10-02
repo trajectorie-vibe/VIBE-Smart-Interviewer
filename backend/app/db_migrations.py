@@ -268,6 +268,12 @@ def migrate_questions_and_tests(engine: Engine):
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """))
+        
+        # Add config column to tests table if missing
+        if _column_missing(engine, 'tests', 'config'):
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE tests ADD COLUMN config JSON"))
+        
         if _table_missing(engine, 'test_questions'):
             with engine.connect() as conn:
                 conn.execute(text("""

@@ -61,17 +61,17 @@ function TestDetailsContent() {
       console.log('[Test Details] Assignment loaded:', found);
       setAssignment(found);
       
-      // If assignment has test_id, fetch the actual test to get question count
+      // If assignment has test_id, fetch question count from test
       let actualQuestionCount = null;
       if (found.test_id) {
         try {
-          const testRes = await apiService.getStructuredTest(found.test_id);
-          if (testRes.data) {
-            actualQuestionCount = testRes.data.questions?.length || testRes.data.question_count || null;
+          const questionsRes = await apiService.getStructuredTestQuestions(found.test_id);
+          if (questionsRes.data) {
+            actualQuestionCount = questionsRes.data.length;
             console.log('[Test Details] Actual question count from test:', actualQuestionCount);
           }
         } catch (error) {
-          console.error('[Test Details] Failed to load test details:', error);
+          console.error('[Test Details] Failed to load test questions:', error);
         }
       }
       
@@ -183,10 +183,10 @@ function TestDetailsContent() {
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 mb-1">Total Questions</h3>
                     <p className="text-3xl font-bold text-orange-600">
-                      {config.total_questions || config.base_questions || 'Not set'}
+                      {config.total_questions ? `${config.total_questions}+` : (config.base_questions ? `${config.base_questions}+` : 'Not set')}
                     </p>
                     <p className="text-sm text-gray-600 mt-1">
-                      {config.total_questions ? `${config.total_questions} questions in this assessment` : (config.base_questions ? `${config.base_questions} questions in this assessment` : 'Question count will be determined at test start')}
+                      {config.total_questions ? `${config.total_questions} base question${config.total_questions !== 1 ? 's' : ''} plus follow-up questions` : (config.base_questions ? `${config.base_questions} base question${config.base_questions !== 1 ? 's' : ''} plus follow-up questions` : 'Question count will be determined at test start')}
                     </p>
                   </div>
                 </div>

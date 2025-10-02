@@ -514,19 +514,28 @@ async def start_assigned_test(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Mark a test assignment as started"""
+    """Mark a test assignment as started (idempotent - returns assignment if already started)"""
     if current_user.role != "candidate":
         raise HTTPException(status_code=403, detail="Only candidates can start tests")
     
+    # Find assignment regardless of status
     assignment = db.query(TestAssignment).filter(
-    TestAssignment.id == assignment_id,
-    TestAssignment.user_id == current_user.id,
-        TestAssignment.status == "assigned"
+        TestAssignment.id == assignment_id,
+        TestAssignment.user_id == current_user.id
     ).first()
     
     if not assignment:
-        raise HTTPException(status_code=404, detail="Test assignment not found or already started")
+        raise HTTPException(status_code=404, detail="Test assignment not found")
     
+    # If already completed, don't allow restart
+    if assignment.status == "completed":
+        raise HTTPException(status_code=400, detail="This test has already been completed")
+    
+    # If already started, just return it (idempotent)
+    if assignment.status == "started":
+        return assignment
+    
+    # Update status from "assigned" to "started"
     assignment.status = "started"
     assignment.started_at = datetime.utcnow()
     assignment.updated_at = datetime.utcnow()
@@ -534,4 +543,4 @@ async def start_assigned_test(
     db.commit()
     db.refresh(assignment)
     
-    return {"message": "Test started successfully", "assignment": assignment}
+    return assignment
