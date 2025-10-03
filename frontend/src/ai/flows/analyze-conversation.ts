@@ -10,9 +10,10 @@
  */
 
 import { getAI } from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'genkit';
 import { translateToEnglish } from './translate-text';
 import { translationService } from '@/lib/translation-service';
+import { DEFAULT_MODEL } from '@/ai/config';
 
 const QuestionAnswerSchema = z.object({
   question: z.string(),
@@ -83,7 +84,7 @@ const prompt = ai.definePrompt({
   name: 'analyzeConversationPrompt',
   input: {schema: AnalyzeConversationInputSchema.extend({ competenciesToAssess: z.string() })},
   output: {schema: AnalyzeConversationOutputSchema},
-  model: process.env.GEMINI_DEFAULT_MODEL || 'googleai/gemini-2.0-flash-lite',
+  model: process.env.GEMINI_DEFAULT_MODEL || DEFAULT_MODEL,
   prompt: `You are an expert AI hiring analyst for a top-tier recruitment firm. Your task is to evaluate a candidate named {{{name}}} for a {{{roleCategory}}} position based on the provided job description and interview transcript.
 
 **Job Description Context:**

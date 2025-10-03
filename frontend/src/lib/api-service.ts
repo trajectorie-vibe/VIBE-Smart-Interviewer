@@ -3,6 +3,8 @@
  * Replaces Firebase with FastAPI backend communication
  */
 
+import type { StartAttemptRequest, StartAttemptResponse } from "@/types/database";
+
 export interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -602,6 +604,13 @@ class FastAPIService {
       Object.entries(params).reduce((acc, [k, v]) => { if (v !== undefined && v !== null) acc[k] = String(v); return acc; }, {} as Record<string,string>)
     ).toString() : '';
     return this.request<any[]>(`/api/v1/test-attempts${query}`);
+  }
+
+  async startTestAttempt(data: StartAttemptRequest): Promise<ApiResponse<StartAttemptResponse>> {
+    return this.request<StartAttemptResponse>('/api/v1/tests/attempts/start', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async createTestAttempt(data: { user_id: string; test_type: string; assignment_id: string; status: string }): Promise<ApiResponse<any>> {

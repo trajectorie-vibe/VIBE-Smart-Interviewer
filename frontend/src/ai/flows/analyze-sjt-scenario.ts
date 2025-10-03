@@ -8,6 +8,7 @@
 import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
 import { translateToEnglish } from './translate-text';
+import { SJT_EVALUATION_MODEL } from '@/ai/config';
 
 const ConversationEntrySchema = z.object({
   question: z.string().describe('The question asked to the candidate'),
@@ -48,7 +49,7 @@ const prompt = ai.definePrompt({
   name: 'analyzeSJTScenarioPrompt',
   input: { schema: AnalyzeSJTScenarioInputSchema },
   output: { schema: AnalyzeSJTScenarioOutputSchema },
-  model: process.env.GEMINI_SJT_EVALUATION_MODEL || 'googleai/gemini-2.0-flash-lite', // Use 2.0 Flash-Lite for better availability and performance
+  model: SJT_EVALUATION_MODEL,
   prompt: `
     You are an expert talent assessor specializing in Situational Judgement Tests.
     A candidate was presented with the following scenario and engaged in a complete conversation:

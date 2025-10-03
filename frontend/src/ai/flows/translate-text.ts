@@ -8,6 +8,7 @@
 
 import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
+import { DEFAULT_MODEL } from '@/ai/config';
 
 const TranslateTextInputSchema = z.object({
   textToTranslate: z.string().describe('The text that needs to be translated.'),
@@ -66,7 +67,7 @@ const prompt = ai.definePrompt({
   name: 'translateTextPrompt',
   input: { schema: TranslateTextInputSchema },
   output: { schema: TranslateTextOutputSchema },
-  model: process.env.GEMINI_DEFAULT_MODEL || 'googleai/gemini-2.0-flash-lite',
+  model: DEFAULT_MODEL,
   prompt: `
     Translate the following text into {{{targetLanguage}}}.
     Return only the translated text, with no additional commentary or explanations.
@@ -80,7 +81,7 @@ const detectLanguagePrompt = ai.definePrompt({
   name: 'detectLanguagePrompt',
   input: { schema: DetectLanguageInputSchema },
   output: { schema: DetectLanguageOutputSchema },
-  model: process.env.GEMINI_DEFAULT_MODEL || 'googleai/gemini-2.0-flash-lite',
+  model: DEFAULT_MODEL,
   prompt: `
     Analyze the following text and detect its primary language.
     Consider mixed-language text and provide the dominant language.
@@ -100,7 +101,7 @@ const translateToEnglishPrompt = ai.definePrompt({
   name: 'translateToEnglishPrompt',
   input: { schema: TranslateToEnglishInputSchema },
   output: { schema: TranslateToEnglishOutputSchema },
-  model: process.env.GEMINI_DEFAULT_MODEL || 'googleai/gemini-2.0-flash-lite',
+  model: DEFAULT_MODEL,
   prompt: `
     Analyze this text and translate it to English if needed.
     If the text is already primarily in English, return it as-is.

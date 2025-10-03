@@ -11,7 +11,8 @@
 
 import { getAI } from '@/ai/genkit';
 import { z } from 'genkit';
-import { translateToEnglish, type TranslateToEnglishOutput } from './translate-text';
+import { translateToEnglish } from './translate-text';
+import { SJT_EVALUATION_MODEL } from '@/ai/config';
 
 const AnalyzeSJTResponseInputSchema = z.object({
   situation: z.string().describe('The workplace scenario that was presented to the candidate.'),
@@ -67,7 +68,7 @@ const prompt = ai.definePrompt({
   name: 'analyzeSJTResponsePrompt',
   input: { schema: AnalyzeSJTResponseInputSchema },
   output: { schema: AnalyzeSJTResponseOutputSchema },
-  model: process.env.GEMINI_SJT_EVALUATION_MODEL || 'googleai/gemini-2.0-flash-lite', // Use 2.0 Flash-Lite for better availability and performance
+  model: SJT_EVALUATION_MODEL,
   prompt: `
     You are an expert talent assessor specializing in Situational Judgement Tests.
     A candidate was presented with the following scenario:
