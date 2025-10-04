@@ -496,6 +496,31 @@ class FastAPIService {
     return this.request<any[]>(`/api/v1/submissions/${submissionId}/media`);
   }
 
+  // Upload media file for submission
+  async uploadSubmissionMedia(
+    submissionId: string,
+    file: File,
+    questionIndex: number,
+    fileType: 'video' | 'audio',
+    scenarioId?: string,
+    isFollowUp?: boolean,
+    followUpSequence?: number
+  ): Promise<ApiResponse<any>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('question_index', String(questionIndex));
+    formData.append('file_type', fileType);
+    if (scenarioId) formData.append('scenario_id', scenarioId);
+    if (isFollowUp !== undefined) formData.append('is_follow_up', String(isFollowUp));
+    if (followUpSequence !== undefined) formData.append('follow_up_sequence', String(followUpSequence));
+
+    return this.request<any>(`/api/v1/submissions/${submissionId}/media`, {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header - browser will set it with boundary for multipart/form-data
+    } as any);
+  }
+
   // Configuration management
   async getConfiguration(type: string): Promise<ApiResponse<any>> {
     // Use explicit type route to avoid UUID/id route collision

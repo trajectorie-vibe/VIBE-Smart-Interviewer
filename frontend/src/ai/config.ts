@@ -7,10 +7,11 @@
  */
 
 // Google upgraded Gemini model slugs in mid-2025; the older `gemini-1.5-flash` alias now 404s.
-// Use the new `*-001` (stable) defaults unless overridden through env vars.
-const DEFAULT_MODEL_FALLBACK = 'googleai/gemini-1.5-flash-001';
-const TRANSCRIPTION_MODEL_FALLBACK = 'googleai/gemini-1.5-flash-001';
-const SJT_MODEL_FALLBACK = 'googleai/gemini-1.5-flash-001';
+// Use the new `*-001` (stable) or `gemini-2.0-flash` (second generation) defaults unless overridden through env vars.
+// Gemini 2.0 Flash is the latest model with multimodal input support, ideal for transcription
+const DEFAULT_MODEL_FALLBACK = 'googleai/gemini-2.0-flash';
+const TRANSCRIPTION_MODEL_FALLBACK = 'googleai/gemini-2.0-flash';
+const SJT_MODEL_FALLBACK = 'googleai/gemini-2.0-flash';
 
 const LEGACY_MODEL_ALIASES: Record<string, string> = {
   'googleai/gemini-1.5-flash': 'googleai/gemini-1.5-flash-001',
@@ -19,6 +20,9 @@ const LEGACY_MODEL_ALIASES: Record<string, string> = {
   'gemini-1.5-flash-latest': 'googleai/gemini-1.5-flash-latest',
   'gemini-1.5-pro': 'googleai/gemini-1.5-pro-001',
   'gemini-1.5-pro-latest': 'googleai/gemini-1.5-pro-latest',
+  // Gemini 2.0 models (second generation)
+  'gemini-2.0-flash': 'googleai/gemini-2.0-flash',
+  'googleai/gemini-2.0-flash': 'googleai/gemini-2.0-flash',
 };
 
 function normalizeModelSlug(slug: string | undefined, fallback: string): string {
@@ -28,10 +32,10 @@ function normalizeModelSlug(slug: string | undefined, fallback: string): string 
   return LEGACY_MODEL_ALIASES[withoutModelsPrefix] || withoutModelsPrefix;
 }
 
-// Default model used for most operations - can be overridden per env
+// Default model used for most operations - Using Gemini 2.0 Flash (second generation workhorse)
 export const DEFAULT_MODEL = normalizeModelSlug(process.env.GEMINI_DEFAULT_MODEL, DEFAULT_MODEL_FALLBACK);
 
-// Model specifically optimized for audio transcription
+// Model specifically optimized for audio transcription - Gemini 2.0 Flash supports multimodal input
 export const TRANSCRIPTION_MODEL = normalizeModelSlug(process.env.GEMINI_TRANSCRIPTION_MODEL, TRANSCRIPTION_MODEL_FALLBACK);
 
 // Model used for SJT evaluation and analysis

@@ -5,7 +5,7 @@ Combines all API endpoints
 
 from fastapi import APIRouter
 
-from app.api import submissions, configurations, tenants, users, question_bank, structured_tests, status, competencies, reports, assignments, tests, statistics
+from app.api import submissions, configurations, tenants, users, question_bank, structured_tests, status, competencies, reports, assignments, tests, statistics, test_attempts
 
 # Create main API router
 api_router = APIRouter(prefix="/api/v1")
@@ -23,3 +23,4 @@ api_router.include_router(reports.router)
 api_router.include_router(assignments.router)
 api_router.include_router(tests.router)
 api_router.include_router(statistics.router)
+api_router.include_router(test_attempts.router)

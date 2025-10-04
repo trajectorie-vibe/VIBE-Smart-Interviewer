@@ -23,10 +23,7 @@ import {
 import RealTimeMediaCapture from "@/components/real-time-audio-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { getSjtFollowUpCount } from "@/lib/config-service";
 import type { InterviewMode } from "@/types";
-import type { StartAttemptRequest } from "@/types/database";
-import type { EvaluateAnswerQualityInput, EvaluateAnswerQualityOutput } from "@/ai/flows/evaluate-answer-quality";
 
 const DEFAULT_READING_SECONDS = 45;
 const DEFAULT_ANSWER_SECONDS = 180;
@@ -47,17 +44,6 @@ interface LoadedQuestion {
 	readingTime: number;
 	answerTime: number;
 	competency?: string | null;
-	scenarioText?: string | null;
-	questionText?: string | null;
-	bestResponseRationale?: string | null;
-	worstResponseRationale?: string | null;
-	/** Identifier for the base question this item belongs to (self for base questions) */
-	baseQuestionId?: string;
-	/** 1-based numbering of the base question, used for follow-up labeling */
-	baseQuestionNumber?: number;
-	/** Index of the follow-up (0-based) when this represents a follow-up question */
-	followUpIndex?: number;
-	isFollowUp?: boolean;
 }
 
 interface StoredAnswer {
@@ -92,11 +78,8 @@ function QuestionsClient() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [attemptId, setAttemptId] = useState<string | null>(null);
+	const [submissionId, setSubmissionId] = useState<string | null>(null);
 	const [initialWarning, setInitialWarning] = useState<string | null>(null);
-	const [testType, setTestType] = useState<"SJT" | "JDT" | string | null>(null);
-	const [maxFollowUps, setMaxFollowUps] = useState(0);
-	const [followUpCounts, setFollowUpCounts] = useState<Record<string, number>>({});
-	const [baseQuestionOrder, setBaseQuestionOrder] = useState<Record<string, number>>({});
 
 	const [readingRemaining, setReadingRemaining] = useState(0);
 	const [prepRemaining, setPrepRemaining] = useState(0);
@@ -243,8 +226,8 @@ function QuestionsClient() {
 
 			const mergedConfig = {
 				...(testDetails?.config ?? {}),
-				...(assignmentData.custom_config ?? {}),
-				...(assignmentData.metadata ?? {}),
+				...((assignmentData as any).custom_config ?? {}),
+				...((assignmentData as any).metadata ?? {}),
 			};
 			setConfig(mergedConfig);
 
@@ -266,43 +249,22 @@ function QuestionsClient() {
 
 					// Extract the actual question text from content based on question type
 					let promptText = `Question ${index + 1}`;
-					let scenarioDesc: string | null = null;
-					let questionText: string | null = null;
-					let bestRationale: string | null = null;
-					let worstRationale: string | null = null;
-					const resolvedId = String(q.id ?? q.question_id ?? q.questionId ?? index);
 					if (q.content) {
 						if (q.question_type === 'SJT') {
 							// For SJT, show labeled sections: SCENARIO: and QUESTION:
 							// The correct field names are: scenarioDescription and question
-							scenarioDesc =
-								q.content.scenarioDescription ||
-								q.content.scenario_description ||
-								q.content.scenario ||
-								q.content.scenarioName ||
-								q.content.situation ||
-								null;
-							questionText =
-								q.content.question ||
-								q.content.prompt ||
-								q.content.questionText ||
-								null;
-							bestRationale =
-								q.content.bestResponseRationale ||
-								q.content.best_response_rationale ||
-								q.content.best_response ||
-								q.content.bestResponse ||
-								null;
-							worstRationale =
-								q.content.worstResponseRationale ||
-								q.content.worst_response_rationale ||
-								q.content.worst_response ||
-								q.content.worstResponse ||
-								null;
+							const scenarioDesc = q.content.scenarioDescription || 
+											     q.content.scenario_description || 
+											     q.content.scenario || 
+											     q.content.scenarioName || // Sometimes just the name
+											     '';
+							const questionText = q.content.question || 
+											     q.content.prompt || 
+											     '';
 							
 							console.log('[SJT Parsing]', { 
-								scenarioDesc: scenarioDesc?.substring(0, 50), 
-								questionText: questionText?.substring(0, 50) 
+								scenarioDesc: scenarioDesc.substring(0, 50), 
+								questionText: questionText.substring(0, 50) 
 							});
 							
 							if (scenarioDesc && questionText) {
@@ -313,152 +275,31 @@ function QuestionsClient() {
 								promptText = `QUESTION:\n${questionText}`;
 							} else {
 								// Ultimate fallback: use the description field
-								const fallbackScenario = q.description ?? q.name ?? '';
-								promptText = `SCENARIO:\n${fallbackScenario}`;
-								scenarioDesc = fallbackScenario || null;
+								promptText = `SCENARIO:\n${q.description}`;
 							}
 						} else if (q.question_type === 'JDT' && q.content.question) {
-							questionText = q.content.question;
 							promptText = q.content.question;
 						} else if (q.question_type === 'CASE' && q.content.prompt) {
-							questionText = q.content.prompt;
 							promptText = q.content.prompt;
 						} else if (q.content.question_text) {
-							questionText = q.content.question_text;
 							promptText = q.content.question_text;
 						}
 					}
 					// Fallback to name or description if content doesn't have the prompt
 					if (promptText === `Question ${index + 1}`) {
-						const fallback = q.name || q.description || q.question_text || q.question || promptText;
-						promptText = fallback;
-						if (!questionText) {
-							questionText = fallback;
-						}
+						promptText = q.name || q.description || q.question_text || q.question || promptText;
 					}
 					
 					console.log('[Question Loading] Final prompt:', promptText.substring(0, 100));
 					
 					return {
-						id: resolvedId,
+						id: String(q.id ?? q.question_id ?? index),
 						prompt: promptText,
 						readingTime: Number(q.reading_time_seconds) || DEFAULT_READING_SECONDS,
 						answerTime: Number(q.answer_time_seconds) || DEFAULT_ANSWER_SECONDS,
 						competency: (Array.isArray(q.competencies) && q.competencies[0]) || q.competency_code || q.assessed_competency || null,
-						scenarioText: scenarioDesc,
-						questionText,
-						bestResponseRationale: bestRationale,
-						worstResponseRationale: worstRationale,
-						baseQuestionId: resolvedId,
-						baseQuestionNumber: index + 1,
-						followUpIndex: 0,
-						isFollowUp: false,
 					};
 				});
-
-			const effectiveTestType = (assignmentData.test_type ?? queryTestType ?? "JDT").toUpperCase() as "JDT" | "SJT";
-			const roleCategoryHint =
-				(assignmentData.metadata?.role_category as string | undefined) ??
-				(assignmentData.metadata?.roleCategory as string | undefined) ??
-				(mergedConfig.role_category as string | undefined) ??
-				(mergedConfig.roleCategory as string | undefined);
-
-			let attemptIdFromServer: string | null = null;
-			let attemptWarning: string | null = null;
-
-			try {
-				const startPayload: StartAttemptRequest = {
-					test_type: effectiveTestType,
-				};
-				if (roleCategoryHint) {
-					startPayload.role_category = roleCategoryHint;
-				}
-
-				const attemptRes = await apiService.startTestAttempt(startPayload);
-				if (!attemptRes.error && attemptRes.data?.attempt) {
-					attemptIdFromServer = attemptRes.data.attempt.id;
-					const attemptQuestions = attemptRes.data.questions;
-					if (Array.isArray(attemptQuestions) && attemptQuestions.length > 0) {
-						const orderMap = new Map<string, number>();
-						attemptQuestions.forEach((item: any, idx: number) => {
-							const candidates = [
-								item?.id,
-								item?.question_id,
-								item?.questionId,
-								item?.question?.id,
-								item?.original_question_id,
-							];
-							const key = candidates.find((value) => value !== undefined && value !== null);
-							if (key !== undefined && key !== null) {
-								orderMap.set(String(key), idx);
-							}
-						});
-						if (orderMap.size) {
-							mapped.sort((a, b) => {
-								const aIndex = orderMap.get(a.id);
-								const bIndex = orderMap.get(b.id);
-								if (aIndex === undefined && bIndex === undefined) return 0;
-								if (aIndex === undefined) return 1;
-								if (bIndex === undefined) return -1;
-								return aIndex - bIndex;
-							});
-						}
-					}
-					attemptWarning = null;
-				} else {
-					attemptWarning =
-						attemptRes.error ||
-						attemptRes.message ||
-						"We could not create a test attempt record. Your answers will still be saved locally.";
-				}
-			} catch (attemptErr) {
-				attemptWarning = attemptErr instanceof Error ? attemptErr.message : null;
-				if (!attemptWarning) {
-					attemptWarning = "We could not create a test attempt record. Your answers will still be saved locally.";
-				}
-			}
-
-			setTestType(effectiveTestType);
-
-			if (effectiveTestType === "SJT") {
-				const baseOrderMap: Record<string, number> = {};
-				const followCountInit: Record<string, number> = {};
-				let baseCounter = 0;
-				mapped.forEach((question) => {
-					const baseId = question.baseQuestionId ?? question.id;
-					if (!question.isFollowUp) {
-						baseCounter += 1;
-						baseOrderMap[baseId] = baseCounter;
-						question.baseQuestionNumber = baseCounter;
-					}
-					if (!(baseId in followCountInit)) {
-						followCountInit[baseId] = 0;
-					}
-				});
-				setBaseQuestionOrder(baseOrderMap);
-				setFollowUpCounts(followCountInit);
-
-				const numericCandidates = [
-					mergedConfig?.follow_up_count,
-					mergedConfig?.followUpCount,
-					mergedConfig?.aiGeneratedQuestions,
-					mergedConfig?.settings?.followUpCount,
-					mergedConfig?.settings?.aiGeneratedQuestions,
-				];
-				const numericValue = numericCandidates.find((value) => typeof value === "number") as number | undefined;
-				let computedMaxFollowUps = 0;
-				if (typeof numericValue === "number") {
-					computedMaxFollowUps = Math.max(0, Math.min(5, Math.floor(numericValue)));
-				} else {
-					const settingsSource = typeof mergedConfig?.settings === "object" ? mergedConfig.settings : mergedConfig;
-					computedMaxFollowUps = getSjtFollowUpCount(settingsSource as any);
-				}
-				setMaxFollowUps(computedMaxFollowUps);
-			} else {
-				setBaseQuestionOrder({});
-				setFollowUpCounts({});
-				setMaxFollowUps(0);
-			}
 
 			setQuestions(mapped);
 			clearAllTimers();
@@ -487,8 +328,37 @@ function QuestionsClient() {
 				setTotalTimer((prev) => prev + 1);
 			}, 1000);
 
-			setAttemptId(attemptIdFromServer);
-			setInitialWarning(attemptWarning);
+			const testType = (assignmentData as any).test_type ?? queryTestType ?? "JDT";
+			const attemptRes = await apiService.createTestAttempt({
+				user_id: user?.id ?? "",
+				test_type: testType,
+				assignment_id: assignmentData.id,
+				status: "in_progress",
+			});
+
+			if (attemptRes.error) {
+				setInitialWarning("We could not create a test attempt record. Your answers will still be saved locally.");
+			} else {
+				setAttemptId(attemptRes.data?.id ?? null);
+			}
+
+			// Create submission for media uploads
+			const submissionRes = await apiService.createSubmission({
+				candidate_name: (user as any)?.candidate_name ?? user?.email ?? "Unknown",
+				candidate_id: (user as any)?.candidate_id ?? user?.id ?? "",
+				test_type: testType,
+				candidate_language: (user as any)?.preferred_language ?? "en",
+				ui_language: (user as any)?.language_code ?? "en",
+				conversation_history: [],
+			});
+
+			if (submissionRes.error) {
+				console.warn("[Bootstrap] Could not create submission:", submissionRes.error);
+			} else {
+				setSubmissionId(submissionRes.data?.id ?? null);
+				console.log("[Bootstrap] ✅ Submission created:", submissionRes.data?.id);
+				setInitialWarning(null);
+			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "Failed to load your questions.";
 			setError(message);
@@ -504,26 +374,53 @@ function QuestionsClient() {
 
 	const finalizeAssessment = useCallback(async () => {
 		try {
+			console.log("[Finalize] Marking test as completed...");
+			
+			// Update test attempt status
 			if (attemptId) {
 				await apiService.updateTestAttempt(attemptId, { status: "completed" });
+				console.log("[Finalize] ✅ Test attempt marked as completed");
+			}
+
+			// Update submission status and add conversation history
+			if (submissionId) {
+				const conversationHistory = Object.entries(responses).map(([questionId, answer], idx) => {
+					const q = questions.find(qu => qu.id === questionId);
+					return {
+						question_id: questionId,
+						question: q?.prompt ?? "Unknown question",
+						answer: answer.transcription,
+						question_index: idx,
+						timestamp: new Date().toISOString(),
+					};
+				});
+
+				await apiService.updateSubmission(submissionId, {
+					status: "completed",
+					conversation_history: conversationHistory,
+					total_questions: totalQuestions,
+					base_questions: totalQuestions,
+					follow_up_questions: 0,
+				});
+				console.log("[Finalize] ✅ Submission updated with conversation history");
 			}
 		} catch (err) {
-			console.warn("[Questions] Failed to update attempt status", err);
+			console.warn("[Finalize] Failed to update completion status:", err);
 		} finally {
 			setPhase("complete");
 			if (totalTimerRef.current) {
 				clearInterval(totalTimerRef.current);
 				totalTimerRef.current = null;
 			}
-			const finalTestType = (testType ?? assignment?.metadata?.test_type ?? queryTestType)?.toString();
 			setTimeout(() => {
+				const testType = (assignment as any)?.test_type ?? queryTestType;
 				router.push(
 					`/candidate/test/complete?assignment_id=${assignmentId}` +
-						(finalTestType ? `&test_type=${finalTestType}` : "")
+						(testType ? `&test_type=${testType}` : "")
 				);
 			}, 600);
 		}
-	}, [assignment?.metadata?.test_type, assignmentId, attemptId, queryTestType, router, testType]);
+	}, [assignment, assignmentId, attemptId, submissionId, queryTestType, router, responses, questions, totalQuestions]);
 
 	useEffect(() => {
 		bootstrap();
@@ -775,150 +672,96 @@ function QuestionsClient() {
 		setPhase("saving");
 
 		try {
-			// Placeholder upload hook: replace with real upload endpoint when available.
-			await new Promise((resolve) => setTimeout(resolve, 750));
-
+			console.log(`[Save Answer] Starting save for question ${currentIndex + 1}/${totalQuestions}`);
+			
+			// Save answer locally first (immediate feedback)
+			const answerData: StoredAnswer = {
+				transcription: transcriptionText,
+				dataUri: currentRecording?.dataUri ?? saved?.dataUri,
+				attemptNumber: (reRecordCountsRef.current[question.id] ?? 0) + 1,
+			};
+			
 			setResponses((prev) => ({
 				...prev,
-				[question.id]: {
-					transcription: transcriptionText,
-					dataUri: currentRecording?.dataUri ?? saved?.dataUri,
-					attemptNumber: (reRecordCountsRef.current[question.id] ?? 0) + 1,
-				},
+				[question.id]: answerData,
 			}));
 
+			// REAL UPLOAD: Upload recording to backend if we have a submission and recording
+			if (submissionId && currentRecording) {
+				console.log(`[Save Answer] 📤 Uploading media to backend...`);
+				
+				try {
+					// Convert blob to File object
+					const fileExtension = currentRecording.blob.type.includes('webm') ? 'webm' : 
+										  currentRecording.blob.type.includes('mp4') ? 'mp4' : 
+										  currentRecording.blob.type.includes('ogg') ? 'ogg' : 'webm';
+					const fileName = `Q${currentIndex + 1}_${mode}.${fileExtension}`;
+					const file = new File(
+						[currentRecording.blob], 
+						fileName,
+						{ type: currentRecording.blob.type || 'video/webm' }
+					);
+
+					console.log(`[Save Answer] File: ${fileName}, Size: ${(file.size / 1024).toFixed(2)} KB, Type: ${file.type}`);
+
+					// Upload to backend
+					const uploadRes = await apiService.uploadSubmissionMedia(
+						submissionId,
+						file,
+						currentIndex,
+						mode === 'audio' ? 'audio' : 'video',
+						question.id, // scenario_id
+						false, // is_follow_up
+						0 // follow_up_sequence
+					);
+
+					if (uploadRes.error) {
+						console.error('[Save Answer] ❌ Upload failed:', uploadRes.error);
+						toast({
+							variant: "destructive",
+							title: "Upload warning",
+							description: `Answer saved locally but upload failed: ${uploadRes.error}. Will retry later.`,
+						});
+					} else {
+						console.log('[Save Answer] ✅ Media uploaded successfully:', uploadRes.data);
+					}
+				} catch (uploadErr) {
+					console.error('[Save Answer] ❌ Upload error:', uploadErr);
+					toast({
+						variant: "destructive",
+						title: "Upload warning",
+						description: "Answer saved locally but upload failed. Will retry later.",
+					});
+				}
+			} else {
+				if (!submissionId) {
+					console.warn('[Save Answer] ⚠️ No submission ID - skipping upload');
+				}
+				if (!currentRecording) {
+					console.log('[Save Answer] ℹ️ No new recording - using existing answer');
+				}
+			}
+			
+			console.log(`[Save Answer] ✅ Answer saved for question ${question.id}`);
+			console.log(`[Save Answer] Transcription length: ${transcriptionText.length} characters`);
+			
+			// Clear current recording state
 			setCurrentRecording(null);
 			setFinalTranscript(transcriptionText);
 			setLiveTranscript("");
 			liveTranscriptRef.current = "";
 
-			let evaluationSummary: EvaluateAnswerQualityOutput | null = null;
-			let followUpInserted = false;
-
-			if (testType === "SJT" && maxFollowUps > 0) {
-				const baseId = question.baseQuestionId ?? question.id;
-				const baseNumber = question.baseQuestionNumber ?? baseQuestionOrder[baseId] ?? currentIndex + 1;
-				const currentFollowUpCount = followUpCounts[baseId] ?? 0;
-				const scenarioText = question.scenarioText?.trim() || question.prompt;
-				const questionText = question.questionText?.trim() || question.prompt;
-				const bestResponse = question.bestResponseRationale?.trim();
-				const competency = question.competency || "General Competency";
-
-				if (
-					currentFollowUpCount < maxFollowUps &&
-					scenarioText &&
-					questionText &&
-					bestResponse
-				) {
-					toast({
-						title: "Evaluating your answer",
-						description: "Checking if a follow-up question is needed...",
-						duration: 3000,
-					});
-
-					try {
-						const evaluationPayload: EvaluateAnswerQualityInput = {
-							situation: scenarioText,
-							question: questionText,
-							bestResponseRationale: bestResponse,
-							assessedCompetency: competency,
-							candidateAnswer: transcriptionText,
-							questionNumber: baseNumber,
-							followUpCount: currentFollowUpCount,
-							maxFollowUps,
-						};
-
-						const response = await fetch('/api/ai/evaluate-answer', {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify(evaluationPayload),
-						});
-
-						if (!response.ok) {
-							throw new Error(`Evaluation failed with status ${response.status}`);
-						}
-
-						const evaluation: EvaluateAnswerQualityOutput = await response.json();
-						evaluationSummary = evaluation;
-
-						if (!evaluation.isComplete && evaluation.followUpQuestion) {
-							const newFollowUpIndex = currentFollowUpCount + 1;
-							const followUpId = `${baseId}__followup_${newFollowUpIndex}`;
-							const followUpQuestionText = evaluation.followUpQuestion.trim();
-							const newQuestion: LoadedQuestion = {
-								id: followUpId,
-								prompt: `SCENARIO:\n${scenarioText}\n\nFOLLOW-UP:\n${followUpQuestionText}`,
-								readingTime: question.readingTime,
-								answerTime: question.answerTime,
-								competency: question.competency,
-								scenarioText,
-								questionText: followUpQuestionText,
-								bestResponseRationale: question.bestResponseRationale,
-								worstResponseRationale: question.worstResponseRationale,
-								baseQuestionId: baseId,
-								baseQuestionNumber: baseNumber,
-								followUpIndex: newFollowUpIndex,
-								isFollowUp: true,
-							};
-
-							const updatedQuestions = [
-								...questions.slice(0, currentIndex + 1),
-								newQuestion,
-								...questions.slice(currentIndex + 1),
-							];
-
-							setQuestions(updatedQuestions);
-							setFollowUpCounts((prev) => ({ ...prev, [baseId]: newFollowUpIndex }));
-							setBaseQuestionOrder((prev) => ({ ...prev, [baseId]: baseNumber }));
-
-							toast({
-								title: "Follow-up question generated",
-								description: evaluation.rationale,
-								duration: 6000,
-								className: "bg-green-50 border border-green-200 text-green-800",
-							});
-
-							prepareQuestion(currentIndex + 1, { questionList: updatedQuestions });
-							followUpInserted = true;
-						}
-					} catch (error) {
-						console.error('Error evaluating answer quality', error);
-						toast({
-							variant: "destructive",
-							title: "Evaluation unavailable",
-							description: "We saved your answer but couldn't run the follow-up check.",
-						});
-					}
-				} else if (currentFollowUpCount < maxFollowUps) {
-					console.warn('Skipping follow-up evaluation due to missing scenario or rationale', {
-						baseId,
-						scenarioAvailable: Boolean(scenarioText),
-						questionAvailable: Boolean(questionText),
-						hasBestResponse: Boolean(bestResponse),
-					});
-				}
-			}
-
-			if (followUpInserted) {
-				return;
-			}
-
-			if (evaluationSummary) {
-				toast({
-					title: "Answer recorded",
-					description: evaluationSummary.rationale,
-					duration: 5000,
-					className: "bg-green-50 border border-green-200 text-green-800",
-				});
-			}
-
+			// Move to next question or finalize
 			if (currentIndex < questions.length - 1) {
+				console.log(`[Save Answer] Moving to question ${currentIndex + 2}/${totalQuestions}`);
 				prepareQuestion(currentIndex + 1);
 			} else {
+				console.log(`[Save Answer] All questions answered, finalizing assessment`);
 				await finalizeAssessment();
 			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "We could not save your answer.";
+			console.error('[Save Answer] ❌ Error:', err);
 			toast({
 				variant: "destructive",
 				title: "Save failed",
@@ -926,21 +769,7 @@ function QuestionsClient() {
 			});
 			setPhase("review");
 		}
-	}, [
-		baseQuestionOrder,
-		currentIndex,
-		currentQuestion,
-		currentRecording,
-		finalTranscript,
-		finalizeAssessment,
-		followUpCounts,
-		maxFollowUps,
-		prepareQuestion,
-		questions,
-		responses,
-		testType,
-		toast,
-	]);
+	}, [currentIndex, currentQuestion, currentRecording, finalizeAssessment, prepareQuestion, questions.length, responses, toast, finalTranscript, totalQuestions, submissionId, mode]);
 
 	const handlePrevious = useCallback(() => {
 		if (currentIndex === 0) {
@@ -955,14 +784,6 @@ function QuestionsClient() {
 	const transcriptionText = (finalTranscript || liveTranscript || savedAnswer?.transcription || "").trim();
 	const canSave = phase !== "loading" && phase !== "recording" && phase !== "saving" && transcriptionText.length > 0 && (hasNewRecording || hasSavedAnswer);
 	const primaryActionLabel = currentIndex === totalQuestions - 1 ? (hasNewRecording ? "Save & submit" : "Submit assessment") : hasNewRecording ? "Save & continue" : "Continue";
-	const isSaving = phase === "saving";
-	const followUpLetter = currentQuestion?.isFollowUp && (currentQuestion.followUpIndex ?? 0) > 0
-		? String.fromCharCode(96 + (currentQuestion.followUpIndex ?? 0))
-		: null;
-	const questionBadgeLabel = currentQuestion?.isFollowUp && followUpLetter
-		? `Follow-up ${currentQuestion.baseQuestionNumber}.${followUpLetter})`
-		: `Question ${currentIndex + 1}`;
-	const questionBadgeTone = currentQuestion?.isFollowUp ? "bg-purple-100 text-purple-700" : "bg-red-100 text-red-700";
 
 	if (!assignmentId) {
 		return (
@@ -1078,69 +899,15 @@ function QuestionsClient() {
 
 					<Card className="border-2 border-red-200/50 bg-white/85 shadow-lg">
 						<CardContent className="space-y-4 px-6 py-6 text-center">
-							<div className={cn("inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold", questionBadgeTone)}>
-								{questionBadgeLabel}
+							<div className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
+								Question {currentIndex + 1}
 							</div>
-							<div className="space-y-5 text-left text-lg leading-relaxed text-gray-900">
-								{(currentQuestion.scenarioText || currentQuestion.questionText) ? (
-									<>
-										{currentQuestion.isFollowUp && (
-											<p className="text-xs font-semibold uppercase tracking-wide text-purple-600">
-												Continuing scenario {currentQuestion.baseQuestionNumber}
-											</p>
-										)}
-										{currentQuestion.scenarioText?.trim() && (
-											<div className="space-y-2">
-												<p className="text-xs font-semibold uppercase tracking-wide text-orange-600">Scenario</p>
-												<p className="whitespace-pre-line text-base text-gray-900">
-													{currentQuestion.scenarioText.trim()}
-												</p>
-											</div>
-										)}
-										{currentQuestion.scenarioText?.trim() && currentQuestion.questionText?.trim() && (
-											<div className="border-t border-dotted border-gray-300" />
-										)}
-										{currentQuestion.questionText?.trim() && (
-											<div className="space-y-2">
-												<p className="text-xs font-semibold uppercase tracking-wide text-red-600">Question</p>
-												<p className="whitespace-pre-line text-base text-gray-900">
-													{currentQuestion.questionText.trim()}
-												</p>
-											</div>
-										)}
-									</>
-								) : (
-									<div>
-										{currentQuestion.prompt.split("\n").map((line, idx) => (
-											<p key={idx} className="mb-3">
-												{line.trim()}
-											</p>
-										))}
-									</div>
-								)}
-								{(currentQuestion.bestResponseRationale?.trim() || currentQuestion.worstResponseRationale?.trim()) && (
-									<div className="rounded-xl border border-orange-200/70 bg-orange-50/70 p-4 text-base text-orange-900">
-										<p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Response guidance</p>
-										<div className="mt-2 space-y-3 text-sm leading-relaxed">
-											{currentQuestion.bestResponseRationale?.trim() && (
-												<div>
-													<p className="font-semibold text-orange-900">Best response rationale</p>
-													<p className="mt-1 text-orange-900/90">
-														{currentQuestion.bestResponseRationale.trim()}
-													</p>
-												</div>
-											)}
-											{currentQuestion.worstResponseRationale?.trim() && (
-												<div>
-													<p className="font-semibold text-orange-900">Worst response rationale</p>
-													<p className="mt-1 text-orange-900/90">
-														{currentQuestion.worstResponseRationale.trim()}
-													</p>
-												</div>
-											)}
-										</div>
-									</div>
-								)}
+							<div className="text-left text-lg leading-relaxed text-gray-900">
+								{currentQuestion.prompt.split("\n").map((line, idx) => (
+									<p key={idx} className="mb-3">
+										{line.trim()}
+									</p>
+								))}
 							</div>
 						</CardContent>
 					</Card>
@@ -1173,6 +940,7 @@ function QuestionsClient() {
 												{phase === "recording" && "Recording answer"}
 												{phase === "review" && "Review answer"}
 												{phase === "saving" && "Saving answer"}
+												{phase === "complete" && "Assessment complete"}
 												{phase === "loading" && "Preparing"}
 											</p>
 										</div>
@@ -1200,7 +968,7 @@ function QuestionsClient() {
 								isRecordingExternally={phase === "recording"}
 								onStartRecording={handleRecorderStart}
 								onStopRecording={handleRecorderStopped}
-								disabled={phase === "loading" || phase === "reading" || phase === "prep" || isSaving}
+								disabled={phase === "loading" || phase === "reading" || phase === "prep" || phase === "saving" || phase === "complete"}
 								captureMode={mode === "text" ? "video" : mode}
 								startTrigger={startTrigger}
 								stopTrigger={stopTrigger}
@@ -1259,7 +1027,7 @@ function QuestionsClient() {
 									variant="outline"
 									className="h-9 w-9"
 									onClick={handlePrevious}
-									disabled={currentIndex === 0 || isSaving}
+									disabled={currentIndex === 0 || phase === "saving"}
 								>
 									<ChevronLeft className="h-4 w-4" />
 								</Button>
@@ -1274,7 +1042,7 @@ function QuestionsClient() {
 											responses[question.id] && idx !== currentIndex && "border-green-500 text-green-600"
 										)}
 										onClick={() => prepareQuestion(idx)}
-										disabled={isSaving}
+										disabled={phase === "saving"}
 									>
 										{idx + 1}
 									</Button>
@@ -1284,7 +1052,7 @@ function QuestionsClient() {
 									variant="outline"
 									className="h-9 w-9"
 									onClick={() => prepareQuestion(Math.min(currentIndex + 1, totalQuestions - 1))}
-									disabled={currentIndex === totalQuestions - 1 || isSaving}
+									disabled={currentIndex === totalQuestions - 1 || phase === "saving"}
 								>
 									<ChevronRight className="h-4 w-4" />
 								</Button>
@@ -1293,7 +1061,7 @@ function QuestionsClient() {
 								<Button
 									variant="outline"
 									onClick={handleRerecord}
-									disabled={!canRerecord || isSaving}
+									disabled={!canRerecord || phase === "saving"}
 									className="border-red-200 text-red-600 hover:bg-red-50"
 								>
 									<RefreshCcw className="mr-2 h-4 w-4" /> Re-record
