@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, AlertTriangle, Camera } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Camera, Video } from 'lucide-react';
 
 interface CameraCheckProps {
   onPassed: () => void;
@@ -205,6 +206,133 @@ export default function CameraCheck({ onPassed, onSkip }: CameraCheckProps) {
   }, [onPassed, passed, stableSince]);
 
   return (
+    <div className="flex min-h-screen flex-col bg-white text-gray-900">
+      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-6 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        >
+          <Card className="border-gray-200 bg-white shadow-sm">
+            <CardContent className="p-8 space-y-6">
+              {/* Header Section */}
+              <div className="mb-4">
+                <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-700 mb-4">
+                  <Video className="h-3 w-3" /> Camera Check
+                </div>
+                <h3 className="text-2xl font-semibold text-gray-900">Camera Readiness Check</h3>
+                <p className="text-sm text-gray-600 mt-2">Ensure your camera and environment meet the requirements</p>
+              </div>
+
+              {/* Video Preview */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                className="relative rounded-lg overflow-hidden bg-black border border-gray-200"
+              >
+                <video ref={videoRef} playsInline muted className="w-full h-auto" />
+                {/* Dotted oval guide */}
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+                  <div className="rounded-full border-2 border-dashed" style={{ width: '60%', height: '60%', borderColor: 'rgba(255,255,255,0.9)' }} />
+                </div>
+                <canvas ref={canvasRef} className="hidden" />
+              </motion.div>
+
+              {/* Messages and Checklist */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.4 }}
+                className="space-y-4"
+              >
+                {error ? (
+                  <div className="flex items-center gap-2 p-4 rounded-lg border border-red-300 bg-red-50 text-red-700">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm">{error}</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Status Messages */}
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <ul className="space-y-2 text-sm text-gray-900">
+                        {messages.map((m, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-gray-600">•</span>
+                            <span>{m}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Checklist Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <ChecklistItem label="Lighting" ok={checklist.lighting} desc="Face a light source; avoid strong backlight." />
+                      <ChecklistItem label="Framing & Centering" ok={checklist.centering} desc="Align your head within the dotted oval." />
+                      <ChecklistItem label="Background" ok={checklist.background} desc="Keep background still; minimize movement." />
+                      <ChecklistItem label="Face detected" ok={checklist.human} desc="Ensure your face is clearly visible to the camera." />
+                      <ChecklistItem label="Camera On" ok={checklist.camera} desc="Ensure your camera is active." />
+                    </div>
+                  </>
+                )}
+              </motion.div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="text-xs text-gray-600 max-w-md">
+                  <strong>Tips:</strong> Center yourself in the oval, use front lighting, and keep the background calm.
+                </div>
+                <div className="flex items-center gap-3">
+                  {onSkip && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      onClick={onSkip} 
+                      disabled={!!error || analyzing}
+                      className="text-gray-700 hover:text-gray-900"
+                    >
+                      Skip
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={() => onPassed()} 
+                    disabled={!passed || !!error || analyzing}
+                    className="bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    Continue
+                  </Button>
+                  {passed && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 200 }}
+                      className="text-green-600 flex items-center gap-1 font-medium text-sm"
+                    >
+                      <CheckCircle className="h-4 w-4" /> Ready
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Footer Tip */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.4 }}
+          className="text-center text-xs text-gray-600"
+        >
+          This check helps ensure the best quality for your video assessment.
+        </motion.div>
+      </main>
+    </div>
+  );
+}
+
+{/* PRESERVED ORIGINAL CODE FOR REFERENCE
+  return (
     <div className="w-full flex justify-center">
       <Card className="w-full max-w-3xl bg-card/60 backdrop-blur-xl">
         <CardContent className="p-6">
@@ -214,7 +342,6 @@ export default function CameraCheck({ onPassed, onSkip }: CameraCheckProps) {
           </div>
           <div className="relative rounded-md overflow-hidden bg-black">
             <video ref={videoRef} playsInline muted className="w-full h-auto" />
-            {/* Dotted oval guide */}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
               <div className="rounded-full border-2 border-dashed" style={{ width: '60%', height: '60%', borderColor: 'rgba(255,255,255,0.8)' }} />
             </div>
@@ -267,14 +394,32 @@ export default function CameraCheck({ onPassed, onSkip }: CameraCheckProps) {
     </div>
   );
 }
+*/}
 
 // Helper components & functions
+const ChecklistItem: React.FC<{ label: string; ok: boolean; desc: string }> = ({ label, ok, desc }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+    className={`p-4 rounded-lg border ${ok ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'}`}
+  >
+    <div className={`font-semibold text-sm flex items-center gap-2 ${ok ? 'text-green-700' : 'text-gray-900'}`}>
+      {ok && <CheckCircle className="h-4 w-4" />}
+      {label}
+    </div>
+    <p className={`text-xs mt-1 ${ok ? 'text-green-600' : 'text-gray-600'}`}>{desc}</p>
+  </motion.div>
+);
+
+{/* PRESERVED ORIGINAL CODE FOR REFERENCE
 const ChecklistItem: React.FC<{ label: string; ok: boolean; desc: string }> = ({ label, ok, desc }) => (
   <div className="p-3 rounded-md border bg-white/50">
     <div className={`font-medium ${ok ? 'text-green-600' : 'text-gray-700'}`}>{label}</div>
     <p className="text-muted-foreground text-xs">{desc}</p>
   </div>
 );
+*/}
 
 function averageBrightness(data: Uint8ClampedArray) {
   let sum = 0;

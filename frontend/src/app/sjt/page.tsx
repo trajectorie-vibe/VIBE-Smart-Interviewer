@@ -964,9 +964,9 @@ function SJTInterviewPage() {
       case 'INTERVIEW':
         if (isProcessing || !currentEntry) {
            return (
-              <div className="flex flex-col items-center justify-center text-center p-8 bg-card/60 backdrop-blur-xl rounded-lg shadow-lg">
-                <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-                <h2 className="text-2xl font-headline text-primary">Loading Scenarios...</h2>
+              <div className="flex flex-col items-center justify-center text-center p-8 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <Loader2 className="h-16 w-16 animate-spin text-gray-600 mb-4" />
+                <h2 className="text-2xl font-semibold text-gray-900">Loading Scenarios...</h2>
               </div>
            );
         }
@@ -985,21 +985,21 @@ function SJTInterviewPage() {
           // Display an upload indicator
           return (
             <div className="w-full max-w-6xl flex flex-col items-center">
-              <div className="w-full rounded-md bg-blue-50 p-4 mb-4 flex items-center justify-between border border-blue-200">
+              <div className="w-full rounded-lg bg-gray-50 p-4 mb-4 flex items-center justify-between border border-gray-200">
                 <div className="flex items-center">
-                  <svg className="animate-pulse mr-2 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="animate-pulse mr-2 h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  <span className="font-medium text-blue-700">Uploading media... ({averageProgress}%)</span>
+                  <span className="font-medium text-gray-900">Uploading media... ({averageProgress}%)</span>
                 </div>
-                <div className="w-1/3 bg-blue-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${averageProgress}%` }}></div>
+                <div className="w-1/3 bg-gray-200 rounded-full h-2">
+                  <div className="bg-gray-900 h-2 rounded-full" style={{ width: `${averageProgress}%` }}></div>
                 </div>
               </div>
               
               {/* Question count display consistent with homepage */}
               <div className="w-full max-w-6xl mb-4">
-                <h1 className="text-2xl font-bold text-center text-gray-700">
+                <h1 className="text-3xl font-semibold text-center text-gray-900">
                   Situational Judgement Test
                 </h1>
                 <p className="text-center text-gray-600 mt-2">
@@ -1047,7 +1047,7 @@ function SJTInterviewPage() {
           <div className="w-full max-w-6xl flex flex-col items-center">
             {/* Question count display consistent with homepage */}
             <div className="w-full mb-4">
-              <h1 className="text-2xl font-bold text-center text-gray-700">
+              <h1 className="text-3xl font-semibold text-center text-gray-900">
                 Situational Judgement Test
               </h1>
               <p className="text-center text-gray-600 mt-2">
@@ -1107,37 +1107,37 @@ function SJTInterviewPage() {
         );
        case 'UPLOADING':
         return (
-            <Card className="w-full max-w-lg text-center animate-fadeIn shadow-lg">
+            <Card className="w-full max-w-lg text-center border-gray-200 bg-white shadow-sm">
                 <CardContent className="p-8">
-                    <div className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-pulse">
+                    <div className="h-16 w-16 text-gray-600 mx-auto mb-4 animate-pulse">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-headline text-primary mb-2">Finalizing your submission...</h2>
-                    <p className="text-muted-foreground mb-6">
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">Finalizing your submission...</h2>
+                    <p className="text-gray-600 mb-6">
                         Please wait while we process your answers.
                     </p>
                     <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6">
-                        <div className="bg-blue-600 h-2.5 rounded-full animate-pulse" style={{ width: '80%' }}></div>
+                        <div className="bg-gray-900 h-2.5 rounded-full animate-pulse" style={{ width: '80%' }}></div>
                     </div>
                 </CardContent>
             </Card>
         );
       case 'COMPLETED':
         return (
-            <Card className="w-full max-w-lg text-center animate-fadeIn shadow-lg">
+            <Card className="w-full max-w-lg text-center border-gray-200 bg-white shadow-sm">
                 <CardContent className="p-8">
-                    <div className="h-16 w-16 text-green-500 mx-auto mb-4">
+                    <div className="h-16 w-16 text-green-600 mx-auto mb-4">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-headline text-primary mb-2">Thank you for your submission!</h2>
-                    <p className="text-muted-foreground mb-6">
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">Thank you for your submission!</h2>
+                    <p className="text-gray-600 mb-6">
                         The hiring team will get back to you with the next steps.
                     </p>
-                    <Button onClick={() => router.push('/')}>
+                    <Button onClick={() => router.push('/')} className="bg-gray-900 text-white hover:bg-gray-800">
                         Back to Dashboard
                     </Button>
                 </CardContent>
@@ -1149,34 +1149,34 @@ function SJTInterviewPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-white text-gray-900">
       <Header />
       {/* 🔒 MINIMAL IMPACT - Add progressive upload indicator */}
       {progressive.isProgressiveUploadEnabled && <ProgressiveUploadIndicator />}
       <main className="flex-grow flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
         {checkingAttempts ? (
           <div className="flex flex-col items-center justify-center text-center p-8">
-            <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-            <h2 className="text-2xl font-headline text-primary">Checking access...</h2>
+            <Loader2 className="h-16 w-16 animate-spin text-gray-600 mb-4" />
+            <h2 className="text-2xl font-semibold text-gray-900">Checking access...</h2>
           </div>
         ) : (
           <div className={!canTakeTest ? "relative" : ""}>
             {/* Greyed out overlay when attempts exceeded */}
             {!canTakeTest && (
               <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
-                <Card className="w-full max-w-lg text-center shadow-lg border-red-200 bg-white">
+                <Card className="w-full max-w-lg text-center shadow-sm border-gray-200 bg-white">
                   <CardContent className="p-8">
-                    <div className="h-16 w-16 text-red-500 mx-auto mb-4">
+                    <div className="h-16 w-16 text-red-600 mx-auto mb-4">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                       </svg>
                     </div>
-                    <h2 className="text-2xl font-headline text-red-600 mb-2">Access Restricted</h2>
-                    <p className="text-muted-foreground mb-6">
+                    <h2 className="text-2xl font-semibold text-red-600 mb-2">Access Restricted</h2>
+                    <p className="text-gray-600 mb-6">
                       You have reached the maximum number of attempts ({MAX_ATTEMPTS}) for this test. 
                       Please contact your administrator if you need additional attempts.
                     </p>
-                    <Button onClick={() => router.push('/')} variant="outline">
+                    <Button onClick={() => router.push('/')} variant="outline" className="border-gray-300 text-gray-900 hover:bg-gray-100">
                       Back to Dashboard
                     </Button>
                   </CardContent>

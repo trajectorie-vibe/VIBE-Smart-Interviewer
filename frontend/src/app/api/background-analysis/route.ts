@@ -159,7 +159,21 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      console.log(`🤖 Analyzing SJT submission with ${submission.history.length} entries...`);
+      // FIX: Check if submission.history exists and is an array before accessing length
+      const historyEntries = submission && submission.history && Array.isArray(submission.history) ? submission.history : [];
+      console.log(`🤖 Analyzing SJT submission with ${historyEntries.length} entries...`);
+      
+      // FIX: If no history entries, return early with appropriate message
+      if (historyEntries.length === 0) {
+        console.warn('⚠️ No conversation history found for submission, cannot generate analysis');
+        return NextResponse.json(
+          { 
+            error: 'No conversation history available',
+            message: 'The submission does not contain any answered questions to analyze.'
+          },
+          { status: 400 }
+        );
+      }
       
       // Get SJT configuration to retrieve follow-up penalty
       let followUpPenalty = 0;
@@ -201,11 +215,11 @@ export async function POST(request: NextRequest) {
         console.warn('⚠️ Could not load competencies; proceeding without validation', e);
       }
       
-        // Group entries by scenario
-        const scenarioGroups = groupEntriesByScenario(submission.history);
+        // Group entries by scenario - Use the safe historyEntries array
+        const scenarioGroups = groupEntriesByScenario(historyEntries);
         console.log(`📊 Identified ${scenarioGroups.size} unique scenarios`);
         console.log(`📊 Scenario keys: ${Array.from(scenarioGroups.keys()).join(', ')}`);
-        console.log(`📊 Total questions in submission: ${submission.history.length}`);      const sjtAnalyses: Array<{
+        console.log(`📊 Total questions in submission: ${historyEntries.length}`);      const sjtAnalyses: Array<{
         competency: string;
         score: number;
         rationale: string;
@@ -627,7 +641,7 @@ export async function POST(request: NextRequest) {
         
         const summaryText = `COMPREHENSIVE ASSESSMENT SUMMARY:
 
-The candidate completed ${sjtAnalyses.length} of ${submission.history.length} situational judgment scenarios with detailed AI analysis. 
+The candidate completed ${sjtAnalyses.length} of ${historyEntries.length} situational judgment scenarios with detailed AI analysis. 
 
 OVERALL PERFORMANCE: ${performanceLevel}
 - Pre-penalty Average: ${overallAvgPrePenaltyScore.toFixed(1)}/10
@@ -657,9 +671,9 @@ OVERALL ASSESSMENT: ${strongResponses.length > improvementAreas.length ?
   'The candidate shows balanced performance across assessed competencies with equal strengths and development opportunities. Continued growth and targeted skill enhancement will support their professional advancement.'}`;
 
         // Generate question-wise details for Section 3 - FIXED: Map individual questions correctly
-        console.log(`🔍 Generating Section 3 details for ${submission.history.length} individual questions`);
+        console.log(`🔍 Generating Section 3 details for ${historyEntries.length} individual questions`);
         
-        const questionwiseDetails: QuestionwiseDetail[] = (submission.history as any[])
+        const questionwiseDetails: QuestionwiseDetail[] = (historyEntries as any[])
           .filter((entry: any) => entry.answer) // Only include answered questions
           .map((entry: any, questionIndex: number) => {
             // Find which scenario analysis this question belongs to
@@ -703,7 +717,7 @@ OVERALL ASSESSMENT: ${strongResponses.length > improvementAreas.length ?
             // Get all questions for this competency - FIXED: Map individual questions correctly
             console.log(`🎯 Generating summary for competency: ${competencyName}`);
             
-            const competencyResponses = (submission.history as any[])
+            const competencyResponses = (historyEntries as any[])
               .filter((entry: any) => entry.answer) // Only answered questions
               .map((entry: any, questionIndex: number) => {
                 // Find the analysis for this question's scenario
@@ -730,8 +744,8 @@ OVERALL ASSESSMENT: ${strongResponses.length > improvementAreas.length ?
               })
               .filter((response: any) => {
                 // Only include questions that actually assess this competency
-                const entryScenarioKey = submission.history[response.questionNumber - 1]?.situation ? 
-                  submission.history[response.questionNumber - 1].situation!.trim().substring(0, 50).replace(/[^\w\s]/g, '').trim() :
+                const entryScenarioKey = historyEntries[response.questionNumber - 1]?.situation ? 
+                  historyEntries[response.questionNumber - 1].situation!.trim().substring(0, 50).replace(/[^\w\s]/g, '').trim() :
                   `Question_${response.questionNumber}`;
                 
                 return sjtAnalyses.some(analysis => 
@@ -810,10 +824,12 @@ OVERALL ASSESSMENT: ${strongResponses.length > improvementAreas.length ?
         // Fall back to basic result if no AI analysis
         const fsSubmission = await submissionService.getById(submissionId);
         const submission = convertFirestoreSubmission(fsSubmission!);
+        // FIX: Check if submission and submission.history exist before accessing length
+        const historyLength = submission && submission.history && Array.isArray(submission.history) ? submission.history.length : 0;
         analysisResult = submission.report || {
           strengths: "Basic analysis completed.",
           weaknesses: "Full AI analysis was not available.",
-          summary: `The candidate completed ${submission.history.length} scenarios.`,
+          summary: `The candidate completed ${historyLength} scenarios.`,
           competencyAnalysis: []
         };
       }

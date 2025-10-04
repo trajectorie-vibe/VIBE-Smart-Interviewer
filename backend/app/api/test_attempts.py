@@ -87,7 +87,6 @@ async def create_test_attempt(
             user_id=uuid.UUID(data.user_id),
             test_type=test_type,
             assignment_id=uuid.UUID(data.assignment_id) if data.assignment_id else None,
-            tenant_id=current_user.tenant_id,
             status=data.status,
             attempt_number=attempt_number,
             started_at=datetime.utcnow(),

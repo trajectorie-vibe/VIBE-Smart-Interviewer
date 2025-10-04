@@ -797,6 +797,72 @@ class FastAPIService {
   async exportQuestionsCSV(): Promise<ApiResponse<{ csv: string }>> {
     return this.request<{ csv: string }>(`/api/v1/question-bank/export`);
   }
+
+  // Analysis/Report generation and download
+  async generateAnalysis(submissionId: string): Promise<ApiResponse<{ message: string; submission_id: string }>> {
+    console.log('[ApiService generateAnalysis] Generating analysis for submission:', submissionId);
+    return this.request<{ message: string; submission_id: string }>(
+      `/api/v1/reports/generate/${submissionId}`,
+      { method: 'POST' }
+    );
+  }
+
+  async downloadAnalysis(submissionId: string): Promise<void> {
+    console.log('[ApiService downloadAnalysis] Downloading analysis for submission:', submissionId);
+    try {
+      const url = `${this.baseURL}/api/v1/reports/${submissionId}/download`;
+      const headers: Record<string, string> = {
+        'Accept': 'text/plain',
+      };
+      
+      if (this.accessToken) {
+        headers['Authorization'] = `Bearer ${this.accessToken}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[ApiService downloadAnalysis] Error response:', errorText);
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Get the blob and trigger download
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Extract filename from Content-Disposition header if available
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `analysis_report_${submissionId}.txt`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      console.log('[ApiService downloadAnalysis] Download successful:', filename);
+    } catch (error) {
+      console.error('[ApiService downloadAnalysis] Error:', error);
+      throw error;
+    }
+  }
+
+  async getAnalysis(submissionId: string): Promise<ApiResponse<any>> {
+    console.log('[ApiService getAnalysis] Fetching analysis for submission:', submissionId);
+    return this.request<any>(`/api/v1/reports/${submissionId}`);
+  }
 }
 
 // Export singleton instance

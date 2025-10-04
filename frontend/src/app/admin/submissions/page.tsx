@@ -466,6 +466,56 @@ export default function AdminSubmissionsPage() {
     }
   };
 
+  const handleGenerateAnalysis = async (submissionId: string) => {
+    try {
+      console.log('[AdminSubmissions] Generating analysis for submission:', submissionId);
+      const response = await apiService.generateAnalysis(submissionId);
+      if (response.error) {
+        toast({
+          title: "Generation Failed",
+          description: response.error,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Analysis generation started! Refresh in a few moments to see the results.",
+          variant: "default",
+        });
+        // Refresh submissions to update status
+        const list = await getSubmissions();
+        setSubmissions(list as Submission[]);
+        setFilteredSubmissions(list as Submission[]);
+      }
+    } catch (error) {
+      console.error('[AdminSubmissions] Error generating analysis:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate analysis. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadAnalysis = async (submissionId: string) => {
+    try {
+      console.log('[AdminSubmissions] Downloading analysis for submission:', submissionId);
+      await apiService.downloadAnalysis(submissionId);
+      toast({
+        title: "Success",
+        description: "Analysis report downloaded successfully",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('[AdminSubmissions] Error downloading analysis:', error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download analysis. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   if (loading) {
     return (
@@ -636,8 +686,32 @@ export default function AdminSubmissionsPage() {
                               ) : (
                                 <Download className="h-4 w-4 mr-1" />
                               )}
-                              {extractingAudio[submission.id] ? 'Extracting...' : 'Download'}
+                              {extractingAudio[submission.id] ? 'Extracting...' : 'Media'}
                             </Button>
+
+                            {(submission.status || '').toLowerCase() === 'completed' && !submission.report && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                                onClick={() => handleGenerateAnalysis(submission.id)}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                Generate
+                              </Button>
+                            )}
+
+                            {submission.report && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                onClick={() => handleDownloadAnalysis(submission.id)}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                Analysis
+                              </Button>
+                            )}
 
                             <AlertDialog>
                               <AlertDialogTrigger asChild>

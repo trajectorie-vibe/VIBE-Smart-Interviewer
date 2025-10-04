@@ -119,6 +119,36 @@ export default function AdminDashboard() {
     event.target.value = '';
   };
 
+  const handleGenerateAnalysis = async (submissionId: string) => {
+    try {
+      console.log('[AdminDashboard] Generating analysis for submission:', submissionId);
+      const response = await apiService.generateAnalysis(submissionId);
+      if (response.error) {
+        alert(`Failed to generate analysis: ${response.error}`);
+      } else {
+        alert('Analysis generation started! Refresh the page in a few moments to see the results.');
+        // Refresh submissions to update status
+        const res = await apiService.getSubmissions(tenantScoped ? { tenant_id: tenantScoped } : undefined);
+        if (!res.error && res.data) {
+          setSubmissions(Array.isArray(res.data) ? res.data.map(mapSubmission) : []);
+        }
+      }
+    } catch (error) {
+      console.error('[AdminDashboard] Error generating analysis:', error);
+      alert('Failed to generate analysis. Please try again.');
+    }
+  };
+
+  const handleDownloadAnalysis = async (submissionId: string) => {
+    try {
+      console.log('[AdminDashboard] Downloading analysis for submission:', submissionId);
+      await apiService.downloadAnalysis(submissionId);
+    } catch (error) {
+      console.error('[AdminDashboard] Error downloading analysis:', error);
+      alert('Failed to download analysis. Please try again.');
+    }
+  };
+
   // Removed automatic redirect from /admin to /admin/user-updates
 
   return (
@@ -212,30 +242,73 @@ export default function AdminDashboard() {
                           <TableHead className="text-slate-600">Candidate</TableHead>
                           <TableHead className="text-slate-600">Assessment</TableHead>
                           <TableHead className="text-slate-600">Status</TableHead>
+                          <TableHead className="text-slate-600">Progress</TableHead>
                           <TableHead className="text-slate-600">AI analysis</TableHead>
                           <TableHead className="text-slate-600">Created</TableHead>
-                          <TableHead className="text-slate-600">Language</TableHead>
+                          <TableHead className="text-slate-600">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {submissions.slice(0, 12).map((row) => (
-                          <TableRow key={row.id} className="border-slate-200">
-                            <TableCell className="font-medium text-slate-900">{row.candidateName}</TableCell>
-                            <TableCell>{row.testType ?? 'Structured assessment'}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="border-slate-300 text-slate-700">
-                                {(row.status ?? 'pending').replace(/_/g, ' ')}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={`px-3 py-1 text-xs ${row.analysisStatus?.includes('completed') ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' : 'bg-amber-50 text-amber-700 border border-amber-300'}`}>
-                                {row.analysisStatus ?? 'pending'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</TableCell>
-                            <TableCell>{row.language?.toUpperCase?.() ?? 'EN'}</TableCell>
-                          </TableRow>
-                        ))}
+                        {submissions.slice(0, 12).map((row) => {
+                          const isCompleted = row.status === 'completed';
+                          const hasAnalysis = row.analysisStatus?.includes('completed');
+                          const progressPercent = isCompleted ? 100 : (row.status === 'started' ? 50 : 0);
+                          
+                          return (
+                            <TableRow key={row.id} className="border-slate-200">
+                              <TableCell className="font-medium text-slate-900">{row.candidateName}</TableCell>
+                              <TableCell>{row.testType ?? 'Structured assessment'}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="border-slate-300 text-slate-700">
+                                  {(row.status ?? 'pending').replace(/_/g, ' ')}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-2 w-24 bg-slate-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full transition-all duration-300 ${isCompleted ? 'bg-emerald-500' : 'bg-orange-500'}`}
+                                      style={{ width: `${progressPercent}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-slate-600">{progressPercent}%</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={`px-3 py-1 text-xs ${hasAnalysis ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' : 'bg-amber-50 text-amber-700 border border-amber-300'}`}>
+                                  {row.analysisStatus ?? 'pending'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {isCompleted && !hasAnalysis && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
+                                      onClick={() => handleGenerateAnalysis(row.id)}
+                                    >
+                                      <Sparkles className="h-3 w-3 mr-1" />
+                                      Generate
+                                    </Button>
+                                  )}
+                                  {hasAnalysis && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                      onClick={() => handleDownloadAnalysis(row.id)}
+                                    >
+                                      <DownloadCloud className="h-3 w-3 mr-1" />
+                                      Download
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                       <TableCaption className="text-slate-500">
                         Showing latest {Math.min(submissions.length, 12)} submissions.{' '}

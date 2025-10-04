@@ -139,12 +139,10 @@ export default function CandidateExperience() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-white via-orange-50 to-red-50 text-gray-900">
+    <div className="flex min-h-screen flex-col bg-white text-gray-900">
       <Header />
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
-        <section className="relative overflow-hidden rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-red-50 p-10 shadow-2xl">
-          <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-orange-200/40 blur-3xl" />
-          <div className="absolute bottom-0 right-0 hidden h-60 w-60 translate-x-24 translate-y-16 rotate-12 rounded-full bg-red-200/40 blur-3xl md:block" />
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-6 py-6">
+        <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <motion.div
             initial={{ opacity: 0, y: 32 }}
             animate={{ opacity: 1, y: 0 }}
@@ -152,71 +150,60 @@ export default function CandidateExperience() {
             className="relative grid gap-6 md:grid-cols-[2fr,1fr] md:items-center"
           >
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-orange-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-orange-700">
-                <Sparkles className="h-4 w-4" /> Your hiring story starts here
+              <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium uppercase tracking-wider text-gray-700">
+                <Sparkles className="h-3 w-3" /> Dashboard
               </span>
-              <h1 className="mt-6 text-pretty text-4xl font-semibold leading-tight text-gray-900 md:text-5xl">
-                {user?.candidate_name ? `Welcome back, ${user.candidate_name}.` : `Ready to show what${NBSP}you can do?`}
+              <h1 className="mt-4 text-pretty text-3xl font-semibold leading-tight text-gray-900">
+                {user?.candidate_name ? `Welcome back, ${user.candidate_name}` : `Welcome to your dashboard`}
               </h1>
-              <p className="mt-4 max-w-2xl text-lg text-gray-700">
-                We stitched every assessment into one seamless journey. Breeze through structured prompts, capture your thinking clearly, and get tailored feedback the moment you finish.
+              <p className="mt-3 max-w-2xl text-base text-gray-600">
+                Complete your assignments and track your progress. All your tests and results in one place.
               </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-gray-700">
-                <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-300">
-                  <Clock3 className="mr-1 h-3 w-3" /> Adaptive pacing
-                </Badge>
-                <Badge variant="secondary" className="bg-red-100 text-red-700 border-red-300">
-                  <Target className="mr-1 h-3 w-3" /> Competency-aligned
-                </Badge>
-                <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-300">
-                  <Globe2 className="mr-1 h-3 w-3" /> Multilingual ready
-                </Badge>
-              </div>
             </div>
 
-            <Card className="border-orange-200 bg-white/90 backdrop-blur-xl shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between text-base font-medium text-gray-900">
-                  Next checkpoint
-                  <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50">
+            <Card className="border-gray-200 bg-white shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between text-sm font-semibold text-gray-900">
+                  Next Assignment
+                  <Badge variant="outline" className="border-gray-300 text-gray-700 bg-gray-50 text-xs">
                     {highlight ? statusLabel(highlight) : 'Queued'}
                   </Badge>
                 </CardTitle>
-                <CardDescription className="text-gray-600">
+                <CardDescription className="text-xs text-gray-600">
                   {highlight?.deadline_at
-                    ? `Submit ${highlight.name} ${highlight.relativeDeadline}`
+                    ? `Due ${highlight.relativeDeadline}`
                     : highlight
-                      ? 'Your assignment is ready when you are.'
-                      : 'We will notify you when your next assignment unlocks.'}
+                      ? 'Ready to start'
+                      : 'No assignments available'}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-6">
+              <CardContent className="flex flex-col gap-3 pt-0">
                 {highlight ? (
                   <>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                         <div>
-                          <p className="text-xs uppercase tracking-[0.34em] text-gray-600">Assessment</p>
-                          <p className="text-lg font-medium text-gray-900">{highlight.name}</p>
+                          <p className="text-xs text-gray-500">Assessment</p>
+                          <p className="text-sm font-medium text-gray-900">{highlight.name}</p>
                         </div>
                         <Button
-                          variant="secondary"
+                          variant="default"
                           size="sm"
-                          className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-red-600 text-white hover:from-orange-700 hover:to-red-700"
+                          className="flex items-center gap-1 bg-gray-900 text-white hover:bg-gray-800"
                           onClick={() => handleStart(highlight.id)}
                           disabled={highlight.isNotYetOpen}
                         >
                           {highlight.isNotYetOpen ? (
-                            <CalendarDays className="h-4 w-4" />
+                            <CalendarDays className="h-3 w-3" />
                           ) : (
-                            <PlayCircle className="h-4 w-4" />
+                            <PlayCircle className="h-3 w-3" />
                           )}
-                          {highlight.isNotYetOpen ? 'Opens soon' : 'Resume'}
+                          {highlight.isNotYetOpen ? 'Soon' : 'Start'}
                         </Button>
                       </div>
-                      <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
-                        <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2">
-                          <Clock3 className="h-4 w-4" />
+                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1">
+                          <Clock3 className="h-3 w-3" />
                           <span>
                             {highlight.metadata?.estimated_minutes
                               ? `${highlight.metadata.estimated_minutes} min`
@@ -225,23 +212,17 @@ export default function CandidateExperience() {
                                 : 'Self-paced'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2">
-                          <Globe2 className="h-4 w-4" />
+                        <div className="flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1">
+                          <Globe2 className="h-3 w-3" />
                           <span className="uppercase">{highlight.language_code ?? 'EN'}</span>
                         </div>
                       </div>
                     </div>
-                    <Button asChild variant="ghost" className="group justify-start gap-2 px-0 text-sm text-gray-600 hover:text-orange-600">
-                      <Link href="#assignments">
-                        View full assignment list
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                      </Link>
-                    </Button>
                   </>
                 ) : (
-                  <div className="flex items-center gap-3 text-sm text-gray-600">
-                    <Loader2 className="h-4 w-4 animate-spin text-orange-600" />
-                    Checking for assignments linked to your profile…
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <Loader2 className="h-3 w-3 animate-spin text-gray-600" />
+                    Checking for assignments...
                   </div>
                 )}
               </CardContent>
@@ -250,27 +231,27 @@ export default function CandidateExperience() {
         </section>
 
         <section id="assignments" className="grid gap-6 md:grid-cols-[2fr,1fr]">
-          <Card className="border-orange-200 bg-white shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-xl text-gray-900">Your assignments</CardTitle>
-              <CardDescription className="text-sm text-gray-600">
-                We organize everything chronologically. Launch from here or preview key details at a glance.
+          <Card className="border-gray-200 bg-white shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold text-gray-900">Your Assignments</CardTitle>
+              <CardDescription className="text-xs text-gray-600">
+                All your assigned tests and assessments
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               {loading && (
-                <div className="flex items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-gray-700">
-                  <Loader2 className="h-4 w-4 animate-spin text-orange-600" /> Fetching assignments…
+                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+                  <Loader2 className="h-3 w-3 animate-spin text-gray-600" /> Loading assignments...
                 </div>
               )}
               {!loading && error && (
-                <div className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
                   {error}
                 </div>
               )}
               {!loading && !error && !upcoming.length && (
-                <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-6 text-center text-sm text-gray-700">
-                  You\u00a0have no assignments right now. We\u00a0will ping you as soon as the next experience unlocks.
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-4 text-center text-xs text-gray-600">
+                  No assignments available at the moment
                 </div>
               )}
               {!loading && !error && upcoming.map((assignment) => (
@@ -279,61 +260,61 @@ export default function CandidateExperience() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2, delay: 0.03 }}
-                  className="flex flex-col gap-4 rounded-3xl border border-orange-200 bg-white p-5 shadow-lg"
+                  className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{assignment.name}</h3>
-                      <p className="text-sm text-gray-600">
-                        {assignment.test_name ? assignment.test_name : 'Structured interview module'}
+                      <h3 className="text-sm font-semibold text-gray-900">{assignment.name}</h3>
+                      <p className="text-xs text-gray-500">
+                        {assignment.test_name ? assignment.test_name : 'Structured interview'}
                       </p>
                     </div>
-                    <Badge className={`${statusPalette[assignment.status ?? 'pending'] ?? statusPalette.pending} px-3 py-1 text-xs font-semibold uppercase tracking-wide`}> 
+                    <Badge className={`${statusPalette[assignment.status ?? 'pending'] ?? statusPalette.pending} px-2 py-0.5 text-[10px] font-medium uppercase`}> 
                       {statusLabel(assignment)}
                     </Badge>
                   </div>
-                  <div className="grid gap-3 text-sm text-gray-700 md:grid-cols-3">
-                    <div className="flex items-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-3 py-2">
-                      <CalendarDays className="h-4 w-4" />
-                      <span>
+                  <div className="grid gap-2 text-xs text-gray-600 md:grid-cols-3">
+                    <div className="flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1">
+                      <CalendarDays className="h-3 w-3" />
+                      <span className="text-[11px]">
                         {assignment.open_at
-                          ? `Opened ${format(parseISO(assignment.open_at), 'MMM d, h:mm a')}`
-                          : 'Opens on assignment'}
+                          ? format(parseISO(assignment.open_at), 'MMM d')
+                          : 'TBD'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-3 py-2">
-                      <Clock3 className="h-4 w-4" />
-                      <span>
+                    <div className="flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1">
+                      <Clock3 className="h-3 w-3" />
+                      <span className="text-[11px]">
                         {assignment.deadline_at
-                          ? `Due ${format(parseISO(assignment.deadline_at), 'MMM d, h:mm a')}`
-                          : 'No hard deadline'}
+                          ? format(parseISO(assignment.deadline_at), 'MMM d')
+                          : 'No deadline'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-3 py-2">
-                      <Globe2 className="h-4 w-4" />
-                      <span className="uppercase">{assignment.language_code ?? 'EN'}</span>
+                    <div className="flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-2 py-1">
+                      <Globe2 className="h-3 w-3" />
+                      <span className="text-[11px] uppercase">{assignment.language_code ?? 'EN'}</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.32em] text-gray-600">
-                      <span>Mode: {assignment.delivery_mode?.toUpperCase?.() ?? 'VIDEO'}</span>
-                      {assignment.company_name && <span>Company: {assignment.company_name}</span>}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <div className="text-[10px] text-gray-500">
+                      {assignment.delivery_mode?.toUpperCase?.() ?? 'VIDEO'}
                     </div>
                     <Button
-                      variant="outline"
-                      className="group border-orange-300 text-orange-700 hover:border-orange-600 hover:bg-gradient-to-r hover:from-orange-600 hover:to-red-600 hover:text-white"
+                      variant="default"
+                      size="sm"
+                      className="bg-gray-900 text-white hover:bg-gray-800 text-xs h-7"
                       onClick={() => handleStart(assignment.id)}
                       disabled={assignment.isNotYetOpen}
                     >
                       {assignment.isNotYetOpen ? (
                         <>
-                          <Clock3 className="mr-2 h-4 w-4" />
-                          Opens soon
+                          <Clock3 className="mr-1 h-3 w-3" />
+                          Soon
                         </>
                       ) : (
                         <>
-                          <PlayCircle className="mr-2 h-4 w-4" />
-                          Start now
+                          <PlayCircle className="mr-1 h-3 w-3" />
+                          Start
                         </>
                       )}
                     </Button>
@@ -343,19 +324,19 @@ export default function CandidateExperience() {
             </CardContent>
           </Card>
 
-          <Card className="border-orange-200 bg-white shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900">
-                <CheckCircle2 className="h-5 w-5 text-green-600" /> Completed
+          <Card className="border-gray-200 bg-white shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <CheckCircle2 className="h-4 w-4 text-green-600" /> Completed
               </CardTitle>
-              <CardDescription className="text-gray-600">
-                Access reports instantly once an analysis finishes.
+              <CardDescription className="text-xs text-gray-600">
+                View your completed assessments
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {completed.length === 0 && !loading ? (
-                <p className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-6 text-center text-sm text-gray-600">
-                  Your reports will live here when you finish an assessment.
+                <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-4 text-center text-xs text-gray-600">
+                  Completed tests will appear here
                 </p>
               ) : null}
               {completed.map((assignment) => (
@@ -364,19 +345,19 @@ export default function CandidateExperience() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2, delay: 0.02 }}
-                  className="rounded-2xl border border-green-300 bg-green-50 p-4 text-sm text-green-900"
+                  className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-900"
                 >
-                  <p className="text-base font-medium">{assignment.name}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.32em] text-green-700">
+                  <p className="text-sm font-medium">{assignment.name}</p>
+                  <p className="mt-1 text-[10px] text-green-700">
                     Completed {assignment.deadline_at ? format(parseISO(assignment.deadline_at), 'MMM d, yyyy') : 'recently'}
                   </p>
                   <Button
                     asChild
                     size="sm"
-                    className="mt-4 bg-gradient-to-r from-orange-600 to-red-600 text-white hover:from-orange-700 hover:to-red-700"
-                    variant="secondary"
+                    className="mt-3 bg-gray-900 text-white hover:bg-gray-800 text-xs h-7 w-full"
+                    variant="default"
                   >
-                    <Link href={`/report/${assignment.test_id}`}>Open AI report</Link>
+                    <Link href={`/report/${assignment.test_id}`}>View Report</Link>
                   </Button>
                 </motion.div>
               ))}
