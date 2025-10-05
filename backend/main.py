@@ -195,10 +195,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    db_info = db_config.get_connection_info()
     return {
         "status": "healthy",
         "database": "connected" if check_database_health() else "disconnected",
-        "database_type": "sqlite" if db_config.is_sqlite else "postgresql"
+        "database_type": db_info.get("database_type", "unknown")
     }
 
 @app.get("/")

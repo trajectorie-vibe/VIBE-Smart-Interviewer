@@ -1,6 +1,6 @@
 """
 Database configuration and connection management
-Supports both SQLite (development) and PostgreSQL (production)
+Supports SQLite (development) and PostgreSQL/MySQL (production)
 """
 
 import os
@@ -13,36 +13,62 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./trajectorie.db")
-TESTING = os.getenv("TESTING", "false").lower() == "true"
+def _normalize_database_url(url: str) -> str:
+    """Ensure database URLs include explicit drivers when required."""
+    if not url:
+        return url
+    if url.startswith("mysql://"):
+        # Default to PyMySQL driver if none specified
+        return url.replace("mysql://", "mysql+pymysql://", 1)
+    return url
 
-# Determine database type
-if DATABASE_URL.startswith("postgresql"):
-    # PostgreSQL configuration
-    engine = create_engine(
-        DATABASE_URL,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        echo=os.getenv("SQL_ECHO", "false").lower() == "true"
-    )
-elif DATABASE_URL.startswith("sqlite"):
-    # SQLite configuration
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=os.getenv("SQL_ECHO", "false").lower() == "true"
-    )
-    
-    # Enable foreign keys for SQLite
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-else:
-    raise ValueError(f"Unsupported database URL: {DATABASE_URL}")
+
+# Database configuration
+RAW_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./trajectorie.db")
+DATABASE_URL = _normalize_database_url(RAW_DATABASE_URL)
+TESTING = os.getenv("TESTING", "false").lower() == "true"
+SQL_ECHO = os.getenv("SQL_ECHO", "false").lower() == "true"
+
+def _create_engine(url: str):
+    if url.startswith("postgresql"):
+        return create_engine(
+            url,
+            pool_size=int(os.getenv("SQL_POOL_SIZE", "20")),
+            max_overflow=int(os.getenv("SQL_MAX_OVERFLOW", "0")),
+            pool_pre_ping=True,
+            pool_recycle=int(os.getenv("SQL_POOL_RECYCLE", "300")),
+            echo=SQL_ECHO,
+        )
+    if url.startswith("mysql"):
+        return create_engine(
+            url,
+            pool_size=int(os.getenv("SQL_POOL_SIZE", "10")),
+            max_overflow=int(os.getenv("SQL_MAX_OVERFLOW", "10")),
+            pool_pre_ping=True,
+            pool_recycle=int(os.getenv("SQL_POOL_RECYCLE", "280")),
+            echo=SQL_ECHO,
+        )
+    if url.startswith("sqlite"):
+        engine = create_engine(
+            url,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+            echo=SQL_ECHO,
+        )
+
+        # Enable foreign keys for SQLite
+        @event.listens_for(engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+        return engine
+
+    raise ValueError(f"Unsupported database URL: {url}")
+
+engine = _create_engine(DATABASE_URL)
+DATABASE_DIALECT = engine.dialect.name
 
 # Session configuration
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -237,32 +263,30 @@ class DatabaseConfig:
     
     def __init__(self):
         self.database_url = DATABASE_URL
-        self.is_sqlite = DATABASE_URL.startswith("sqlite")
-        self.is_postgresql = DATABASE_URL.startswith("postgresql")
+        self.dialect = DATABASE_DIALECT
+        self.is_sqlite = self.dialect == "sqlite"
+        self.is_postgresql = self.dialect == "postgresql"
+        self.is_mysql = self.dialect in {"mysql", "mariadb"}
         self.testing = TESTING
     
     def get_connection_info(self):
         """Get connection information"""
+        if self.is_sqlite:
+            database_type = "sqlite"
+        elif self.is_postgresql:
+            database_type = "postgresql"
+        elif self.is_mysql:
+            database_type = "mysql"
+        else:
+            database_type = DATABASE_DIALECT
         return {
             "database_url": self.database_url,
-            "database_type": "sqlite" if self.is_sqlite else "postgresql",
+            "database_type": database_type,
             "testing_mode": self.testing
         }
 
 # Singleton instance
 db_config = DatabaseConfig()
-
-# Connection pooling for production
-if db_config.is_postgresql:
-    # PostgreSQL-specific optimizations
-    engine = create_engine(
-        DATABASE_URL,
-        pool_size=20,
-        max_overflow=0,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        echo=os.getenv("SQL_ECHO", "false").lower() == "true"
-    )
 
 # Logging configuration for database operations
 logging.getLogger('sqlalchemy.engine').setLevel(
