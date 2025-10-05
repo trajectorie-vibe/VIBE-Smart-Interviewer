@@ -35,9 +35,9 @@ except Exception as e:
 
 # Import the FastAPI application and wrap for WSGI
 try:
-    from asgiref.wsgi import AsgiToWsgi
+    from a2wsgi import ASGIMiddleware
     from main import app
-    application = AsgiToWsgi(app)
+    application = ASGIMiddleware(app)
     print("✅ Successfully wrapped FastAPI application for WSGI")
 except Exception as e:
     print(f"❌ Error importing application: {e}")
