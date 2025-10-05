@@ -33,10 +33,12 @@ try:
 except Exception as e:
     print(f"❌ Error loading environment: {e}")
 
-# Import the FastAPI application
+# Import the FastAPI application and wrap for WSGI
 try:
-    from main import app as application
-    print("✅ Successfully imported FastAPI application")
+    from asgiref.wsgi import AsgiToWsgi
+    from main import app
+    application = AsgiToWsgi(app)
+    print("✅ Successfully wrapped FastAPI application for WSGI")
 except Exception as e:
     print(f"❌ Error importing application: {e}")
     raise
