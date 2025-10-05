@@ -1,16 +1,20 @@
 """
 WSGI Configuration for PythonAnywhere
-This file is used to configure the WSGI application for PythonAnywhere deployment.
+This file wraps the FastAPI (ASGI) application for WSGI deployment.
 """
 
 import sys
 import os
-from pathlib import Path
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # IMPORTANT: Update this with your PythonAnywhere username
 # ============================================================================
-PYTHONANYWHERE_USERNAME = "cogniviewandcognify"  # CHANGE THIS!
+PYTHONANYWHERE_USERNAME = "cogniviewandcognify"
 # ============================================================================
 
 # Add your project directory to the sys.path
@@ -20,33 +24,39 @@ if project_home not in sys.path:
 
 # Change to project directory
 os.chdir(project_home)
+logger.info(f"Working directory: {os.getcwd()}")
 
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
-    env_path = Path(project_home) / '.env'
-    if env_path.exists():
-        load_dotenv(env_path)
-        print(f"✅ Loaded environment from: {env_path}")
+    env_file = os.path.join(project_home, '.env')
+    if os.path.exists(env_file):
+        load_dotenv(env_file)
+        logger.info(f"✅ Loaded environment from: {env_file}")
     else:
-        print(f"⚠️  No .env file found at: {env_path}")
+        logger.warning(f"⚠️  No .env file found at: {env_file}")
 except Exception as e:
-    print(f"❌ Error loading environment: {e}")
+    logger.error(f"❌ Error loading environment: {e}")
 
-# Import the FastAPI application and wrap for WSGI
+# Import and wrap the FastAPI application for WSGI
 try:
+    # Import the ASGI-to-WSGI adapter
     from a2wsgi import ASGIMiddleware
+    
+    # Import the FastAPI app
     from main import app
+    
+    # Wrap it for WSGI compatibility
     application = ASGIMiddleware(app)
-    print("✅ Successfully wrapped FastAPI application for WSGI")
-except Exception as e:
-    print(f"❌ Error importing application: {e}")
+    
+    logger.info("✅ Successfully wrapped FastAPI application for WSGI")
+    logger.info(f"Database URL configured: {'Yes' if os.getenv('DATABASE_URL') else 'No'}")
+    logger.info(f"CORS origins: {os.getenv('CORS_ORIGINS', 'Not set')}")
+    
+except ImportError as e:
+    logger.error(f"❌ Import error: {e}")
+    logger.error("Make sure 'a2wsgi' is installed: pip install a2wsgi")
     raise
-
-# For debugging - print environment info (comment out in production)
-if os.getenv('DEBUG_WSGI'):
-    print(f"Python version: {sys.version}")
-    print(f"Python path: {sys.path}")
-    print(f"Current directory: {os.getcwd()}")
-    print(f"DATABASE_URL set: {'Yes' if os.getenv('DATABASE_URL') else 'No'}")
-    print(f"FRONTEND_URL: {os.getenv('FRONTEND_URL', 'Not set')}")
+except Exception as e:
+    logger.error(f"❌ Error creating WSGI application: {e}")
+    raise
