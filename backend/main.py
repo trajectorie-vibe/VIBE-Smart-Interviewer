@@ -110,10 +110,31 @@ app.add_middleware(
 logging.info(f"CORS allow_origins: {origins}")
 
 # Trusted hosts middleware
+# Trusted hosts middleware - make this configurable via environment variable
+# ALLOWED_HOSTS can be a CSV or a JSON array string. Example:
+#   ALLOWED_HOSTS="['localhost','127.0.0.1','cogniviewandcognify.pythonanywhere.com']"
+def _parse_allowed_hosts_from_env(value: str | None) -> list[str]:
+    if not value:
+        return ["localhost", "127.0.0.1", "*.trajectorie.com"]
+    s = value.strip()
+    # try JSON array first
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            data = json.loads(s)
+            return [str(x).strip() for x in data if str(x).strip()]
+        except Exception:
+            pass
+    # fallback CSV
+    parts = [p.strip().strip('\"\'') for p in s.split(",")]
+    return [p for p in parts if p]
+
+env_hosts = os.getenv("ALLOWED_HOSTS") or os.getenv("TRUSTED_HOSTS")
+allowed_hosts = _parse_allowed_hosts_from_env(env_hosts)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", "*.trajectorie.com"]
+    allowed_hosts=allowed_hosts
 )
+logging.info(f"TrustedHostMiddleware allowed_hosts: {allowed_hosts}")
 
 # Include API routes
 app.include_router(api_router)
