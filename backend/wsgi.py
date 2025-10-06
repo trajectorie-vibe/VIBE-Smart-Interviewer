@@ -50,13 +50,16 @@ try:
     # Prefer an installed `asgi2wsgi` package, but fall back to the
     # vendored `_asgi2wsgi.ASGI2WSGI` adapter included in this repo so
     # you don't have to pip-install an external package on PythonAnywhere.
+    # Prefer vendored adapter to avoid mismatched external package versions
     try:
-        from asgi2wsgi import ASGI2WSGI
-        asgi_wrapper = ASGI2WSGI
+        from _asgi2wsgi import ASGI2WSGI as ASGI2WSGI_local
+        asgi_wrapper = ASGI2WSGI_local
+        logger.info("Using vendored _asgi2wsgi adapter")
     except Exception:
         try:
-            from _asgi2wsgi import ASGI2WSGI as ASGI2WSGI_local
-            asgi_wrapper = ASGI2WSGI_local
+            from asgi2wsgi import ASGI2WSGI
+            asgi_wrapper = ASGI2WSGI
+            logger.info("Using installed asgi2wsgi package")
         except Exception:
             asgi_wrapper = None
 
@@ -65,7 +68,7 @@ try:
 
     if asgi_wrapper is not None:
         application = asgi_wrapper(app)
-        logger.info("WSGI application created using asgi2wsgi")
+        logger.info("WSGI application created using ASGI->WSGI adapter")
     else:
         # Fallback: use asgiref's WsgiToAsgi if available (less ideal)
         try:
